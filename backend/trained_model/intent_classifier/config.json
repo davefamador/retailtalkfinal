@@ -1,0 +1,30 @@
+{
+  "bert_model": "bert-base-multilingual-uncased",
+  "max_length": 128,
+  "num_intents": 4,
+  "label_names": [
+    "single_search",
+    "multi_search",
+    "filtered_search",
+    "free_form"
+  ],
+  "best_f1": 0.9704016456031906,
+  "training_time_seconds": 28256.4,
+  "dataset": "c:\\Moi\\Thesis\\Code\\RetailTalkFolder\\shopping_queries_dataset\\IntentDataset_cleaned.xlsx",
+  "dataset_size": 9819,
+  "train_size": 8346,
+  "val_size": 1473,
+  "final_metrics": {
+    "exact_match_accuracy": 0.9111,
+    "hamming_loss": 0.0246,
+    "bleu_score": 0.0657,
+    "micro_precision": 0.9758,
+    "micro_recall": 0.9761,
+    "micro_f1": 0.9759,
+    "macro_precision": 0.9696,
+    "macro_recall": 0.9712,
+    "macro_f1": 0.9704,
+    "weighted_f1": 0.9758,
+    "samples_f1": 0.9668
+  }
+}

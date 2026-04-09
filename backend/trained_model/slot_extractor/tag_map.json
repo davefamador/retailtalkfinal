@@ -1,0 +1,23 @@
+{
+  "B-BRAND": 0,
+  "B-COLOR": 1,
+  "B-CONN": 2,
+  "B-MATERIAL": 3,
+  "B-PRICE_MAX": 4,
+  "B-PRICE_MIN": 5,
+  "B-PRICE_MOD": 6,
+  "B-PRODUCT1": 7,
+  "B-PRODUCT2": 8,
+  "B-RATING_MIN": 9,
+  "B-RATING_MOD": 10,
+  "B-SIZE": 11,
+  "I-BRAND": 12,
+  "I-COLOR": 13,
+  "I-MATERIAL": 14,
+  "I-PRICE_MOD": 15,
+  "I-PRODUCT1": 16,
+  "I-PRODUCT2": 17,
+  "I-RATING_MOD": 18,
+  "I-SIZE": 19,
+  "O": 20
+}

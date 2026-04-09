@@ -1,0 +1,6 @@
+{
+  "single_search": 0,
+  "multi_search": 1,
+  "filtered_search": 2,
+  "free_form": 3
+}

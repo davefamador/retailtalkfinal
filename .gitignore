@@ -1,0 +1,57 @@
+# ========================
+# Secrets
+# ========================
+.env
+.env.local
+.env.*.local
+
+# ========================
+# Large model weights — stored in HuggingFace Model Hub instead
+# Downloaded at Docker build time via download_models.py
+# ========================
+backend/trained_model/intent_classifier/model.pt
+backend/trained_model/slot_extractor/model.pt
+backend/trained_model/ranker/model.safetensors
+backend/trained_model/pytorch_model.bin
+checkpoint.pt
+*.pth
+*.onnx
+*.h5
+
+# ========================
+# Python
+# ========================
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+*.egg-info/
+dist/
+build/
+venv/
+.venv/
+env/
+
+# ========================
+# IDE & OS
+# ========================
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+Thumbs.db
+.DS_Store
+
+# ========================
+# Logs
+# ========================
+*.log
+
+# ========================
+# Not needed for HF Space deployment
+# ========================
+frontend/
+database/
+backend/test_*.py
+backend/Dockerfile
