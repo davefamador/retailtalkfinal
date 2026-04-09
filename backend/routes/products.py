@@ -151,6 +151,7 @@ async def create_product(req: CreateProductRequest, current_user: dict = Depends
         "stock": req.stock,
         "images": req.images,
         "tracking_number": req.tracking_number,
+        "status": "pending",
     }).execute()
 
     if not result.data:
