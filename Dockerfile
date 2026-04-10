@@ -18,12 +18,13 @@ RUN pip install --no-cache-dir -r requirements.txt
 COPY backend/ ./backend/
 
 # Download large model weights from HuggingFace Model Hub
-# HF_TOKEN is mounted as a build secret from Space settings
 RUN --mount=type=secret,id=HF_TOKEN,mode=0444,required=false \
     HF_TOKEN=$(cat /run/secrets/HF_TOKEN 2>/dev/null) python backend/download_models.py
 
-# HuggingFace Spaces runs as non-root user — fix permissions
+# Set up user with ID 1000 as required by HF Spaces
+RUN useradd -m -u 1000 user
 RUN chmod -R 777 /app
+USER user
 
 WORKDIR /app/backend
 
