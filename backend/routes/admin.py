@@ -58,6 +58,7 @@ class DashboardResponse(BaseModel):
     total_departments: int = 0
     total_managers: int = 0
     total_staff: int = 0
+    total_delivery: int = 0
 
 
 class TransactionDetail(BaseModel):
@@ -168,6 +169,7 @@ async def admin_dashboard(admin: dict = Depends(require_admin)):
     buyers_count = sb.table("users").select("id", count="exact").eq("role", "buyer").execute()
     managers_count = sb.table("users").select("id", count="exact").eq("role", "manager").execute()
     staff_count = sb.table("users").select("id", count="exact").eq("role", "seller").execute()
+    delivery_count = sb.table("users").select("id", count="exact").eq("role", "delivery").execute()
     departments_count = sb.table("departments").select("id", count="exact").execute()
 
     return DashboardResponse(
@@ -182,6 +184,7 @@ async def admin_dashboard(admin: dict = Depends(require_admin)):
         total_departments=departments_count.count or 0,
         total_managers=managers_count.count or 0,
         total_staff=staff_count.count or 0,
+        total_delivery=delivery_count.count or 0,
     )
 
 
