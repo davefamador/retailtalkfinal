@@ -20,8 +20,8 @@ def get_supabase() -> Client:
     global _supabase_client
     if _supabase_client is None:
         _supabase_client = create_client(
-            os.environ["SUPABASE_URL"],
-            os.environ["SUPABASE_KEY"],
+            os.environ["SUPABASE_URL"].strip(),
+            os.environ["SUPABASE_KEY"].strip(),
         )
     return _supabase_client
 
@@ -30,7 +30,7 @@ def get_supabase() -> Client:
 
 def get_db_connection():
     """Create a new psycopg3 connection for pgvector queries."""
-    conn = psycopg.connect(os.environ["DATABASE_URL"], row_factory=dict_row)
+    conn = psycopg.connect(os.environ["DATABASE_URL"].strip(), row_factory=dict_row)
     return conn
 
 
