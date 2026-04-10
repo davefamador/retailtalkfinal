@@ -7,9 +7,9 @@ and supabase-py for standard CRUD operations.
 import os
 import psycopg
 from psycopg.rows import dict_row
-from urllib.parse import urlparse
 import numpy as np
 from supabase import create_client, Client
+from config import SUPABASE_URL, SUPABASE_KEY, DATABASE_URL
 
 # --- Supabase Client (for CRUD operations) ---
 
@@ -20,44 +20,18 @@ def get_supabase() -> Client:
     """Get or create the Supabase client for standard CRUD operations."""
     global _supabase_client
     if _supabase_client is None:
-        _supabase_client = create_client(
-            os.environ["SUPABASE_URL"].strip(),
-            os.environ["SUPABASE_KEY"].strip(),
-        )
+        url = (os.environ.get("SUPABASE_URL") or SUPABASE_URL).strip()
+        key = (os.environ.get("SUPABASE_KEY") or SUPABASE_KEY).strip()
+        _supabase_client = create_client(url, key)
     return _supabase_client
 
 
 # --- Direct PostgreSQL connection (for pgvector queries) ---
 
-_cached_ipv4 = None
-
 def get_db_connection():
-    """Create a new psycopg3 connection, forcing IPv4 via hostaddr."""
-    import socket
-    global _cached_ipv4
-    db_url = os.environ["DATABASE_URL"].strip()
-    parsed = urlparse(db_url)
-    hostname = parsed.hostname
-
-    # Resolve hostname to IPv4 once and cache it
-    if _cached_ipv4 is None:
-        results = socket.getaddrinfo(hostname, parsed.port or 5432, socket.AF_INET, socket.SOCK_STREAM)
-        if not results:
-            raise RuntimeError(f"Cannot resolve {hostname} to IPv4")
-        _cached_ipv4 = results[0][4][0]
-        print(f"[DB] Resolved {hostname} -> {_cached_ipv4} (IPv4)")
-
-    # Use conninfo string with hostaddr to bypass libpq DNS
-    conninfo = (
-        f"host={hostname} "
-        f"hostaddr={_cached_ipv4} "
-        f"port={parsed.port or 5432} "
-        f"user={parsed.username} "
-        f"password={parsed.password} "
-        f"dbname={parsed.path.lstrip('/')} "
-        f"sslmode=require"
-    )
-    conn = psycopg.connect(conninfo, row_factory=dict_row)
+    """Create a new psycopg3 connection for pgvector queries."""
+    db_url = (os.environ.get("DATABASE_URL") or DATABASE_URL).strip()
+    conn = psycopg.connect(db_url, row_factory=dict_row)
     return conn
 
 
