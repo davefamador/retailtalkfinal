@@ -5,10 +5,9 @@ and supabase-py for standard CRUD operations.
 """
 
 import os
-import socket
 import psycopg
 from psycopg.rows import dict_row
-from urllib.parse import urlparse, urlunparse
+from urllib.parse import urlparse
 import numpy as np
 from supabase import create_client, Client
 
@@ -30,25 +29,35 @@ def get_supabase() -> Client:
 
 # --- Direct PostgreSQL connection (for pgvector queries) ---
 
-def _resolve_to_ipv4(url: str) -> str:
-    """Replace hostname in DATABASE_URL with its IPv4 address to avoid IPv6 issues."""
-    parsed = urlparse(url)
-    hostname = parsed.hostname
-    try:
-        ipv4 = socket.getaddrinfo(hostname, None, socket.AF_INET)[0][4][0]
-        # Replace hostname with IPv4 IP, keep port
-        port = parsed.port or 5432
-        new_netloc = f"{parsed.username}:{parsed.password}@{ipv4}:{port}"
-        resolved = urlunparse((parsed.scheme, new_netloc, parsed.path, parsed.params, parsed.query, parsed.fragment))
-        return resolved
-    except socket.gaierror:
-        return url
-
+_cached_ipv4 = None
 
 def get_db_connection():
-    """Create a new psycopg3 connection for pgvector queries."""
-    db_url = _resolve_to_ipv4(os.environ["DATABASE_URL"].strip())
-    conn = psycopg.connect(db_url, row_factory=dict_row)
+    """Create a new psycopg3 connection, forcing IPv4 via hostaddr."""
+    import socket
+    global _cached_ipv4
+    db_url = os.environ["DATABASE_URL"].strip()
+    parsed = urlparse(db_url)
+    hostname = parsed.hostname
+
+    # Resolve hostname to IPv4 once and cache it
+    if _cached_ipv4 is None:
+        results = socket.getaddrinfo(hostname, parsed.port or 5432, socket.AF_INET, socket.SOCK_STREAM)
+        if not results:
+            raise RuntimeError(f"Cannot resolve {hostname} to IPv4")
+        _cached_ipv4 = results[0][4][0]
+        print(f"[DB] Resolved {hostname} -> {_cached_ipv4} (IPv4)")
+
+    # Use conninfo string with hostaddr to bypass libpq DNS
+    conninfo = (
+        f"host={hostname} "
+        f"hostaddr={_cached_ipv4} "
+        f"port={parsed.port or 5432} "
+        f"user={parsed.username} "
+        f"password={parsed.password} "
+        f"dbname={parsed.path.lstrip('/')} "
+        f"sslmode=require"
+    )
+    conn = psycopg.connect(conninfo, row_factory=dict_row)
     return conn
 
 
