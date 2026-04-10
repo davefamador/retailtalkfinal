@@ -10,8 +10,9 @@ from pydantic import BaseModel
 from datetime import datetime, timedelta, timezone
 import bcrypt
 import jwt
+import os
 from database import get_supabase
-from config import JWT_SECRET, JWT_ALGORITHM, JWT_EXPIRATION_HOURS
+from config import JWT_ALGORITHM, JWT_EXPIRATION_HOURS
 
 router = APIRouter(prefix="/auth", tags=["Authentication"])
 security = HTTPBearer()
@@ -58,13 +59,13 @@ def create_token(user_id: str, email: str, role: str = "buyer") -> str:
         "exp": datetime.now(timezone.utc) + timedelta(hours=JWT_EXPIRATION_HOURS),
         "iat": datetime.now(timezone.utc),
     }
-    return jwt.encode(payload, JWT_SECRET, algorithm=JWT_ALGORITHM)
+    return jwt.encode(payload, os.environ.get("JWT_SECRET", "change-this-in-production"), algorithm=JWT_ALGORITHM)
 
 
 def verify_token(credentials: HTTPAuthorizationCredentials = Depends(security)) -> dict:
     """Dependency that verifies JWT token and returns the payload."""
     try:
-        payload = jwt.decode(credentials.credentials, JWT_SECRET, algorithms=[JWT_ALGORITHM])
+        payload = jwt.decode(credentials.credentials, os.environ.get("JWT_SECRET", "change-this-in-production"), algorithms=[JWT_ALGORITHM])
         return payload
     except jwt.ExpiredSignatureError:
         raise HTTPException(status_code=401, detail="Token expired")

@@ -4,11 +4,11 @@ Uses psycopg (v3) for direct PostgreSQL/pgvector queries (search),
 and supabase-py for standard CRUD operations.
 """
 
+import os
 import psycopg
 from psycopg.rows import dict_row
 import numpy as np
 from supabase import create_client, Client
-from config import SUPABASE_URL, SUPABASE_KEY, DATABASE_URL
 
 # --- Supabase Client (for CRUD operations) ---
 
@@ -19,7 +19,10 @@ def get_supabase() -> Client:
     """Get or create the Supabase client for standard CRUD operations."""
     global _supabase_client
     if _supabase_client is None:
-        _supabase_client = create_client(SUPABASE_URL, SUPABASE_KEY)
+        _supabase_client = create_client(
+            os.environ["SUPABASE_URL"],
+            os.environ["SUPABASE_KEY"],
+        )
     return _supabase_client
 
 
@@ -27,7 +30,7 @@ def get_supabase() -> Client:
 
 def get_db_connection():
     """Create a new psycopg3 connection for pgvector queries."""
-    conn = psycopg.connect(DATABASE_URL, row_factory=dict_row)
+    conn = psycopg.connect(os.environ["DATABASE_URL"], row_factory=dict_row)
     return conn
 
 

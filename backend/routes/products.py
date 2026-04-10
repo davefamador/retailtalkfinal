@@ -9,10 +9,10 @@ from typing import Optional
 import uuid
 import base64
 
+import os
 from database import get_supabase, store_product_embedding
 from models.bert_service import bert_service
 from routes.auth import get_current_user
-from config import SUPABASE_URL
 
 router = APIRouter(prefix="/products", tags=["Products"])
 
@@ -106,7 +106,7 @@ async def upload_image(
         raise HTTPException(status_code=500, detail=f"Failed to upload image: {str(e)}")
 
     # Get public URL
-    public_url = f"{SUPABASE_URL}/storage/v1/object/public/product-images/{filename}"
+    public_url = f"{os.environ.get('SUPABASE_URL', '')}/storage/v1/object/public/product-images/{filename}"
 
     return {"url": public_url, "filename": filename}
 
