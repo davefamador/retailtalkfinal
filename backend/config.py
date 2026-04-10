@@ -6,7 +6,7 @@ Set these in your HuggingFace Space secrets (Settings > Variables and Secrets).
 import os
 from dotenv import load_dotenv
 
-load_dotenv()
+load_dotenv(override=False)  # Don't override existing env vars (e.g. HF Space secrets)
 
 # Supabase
 SUPABASE_URL = os.getenv("SUPABASE_URL", "")
