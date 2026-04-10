@@ -8,7 +8,7 @@ import os
 from huggingface_hub import hf_hub_download
 
 REPO_ID = "dashm/retailtalk-models"
-TOKEN = os.getenv("HF_TOKEN", None)
+TOKEN = os.getenv("HF_TOKEN") or None
 
 files = [
     ("trained_model/intent_classifier/model.pt",  "intent_classifier/model.pt"),
