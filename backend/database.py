@@ -8,15 +8,9 @@ import os
 import socket
 import psycopg
 from psycopg.rows import dict_row
+from urllib.parse import urlparse, urlunparse
 import numpy as np
 from supabase import create_client, Client
-
-# Force IPv4 resolution for PostgreSQL connections
-_original_getaddrinfo = socket.getaddrinfo
-def _ipv4_only_getaddrinfo(*args, **kwargs):
-    responses = _original_getaddrinfo(*args, **kwargs)
-    return [r for r in responses if r[0] == socket.AF_INET] or responses
-socket.getaddrinfo = _ipv4_only_getaddrinfo
 
 # --- Supabase Client (for CRUD operations) ---
 
@@ -36,9 +30,25 @@ def get_supabase() -> Client:
 
 # --- Direct PostgreSQL connection (for pgvector queries) ---
 
+def _resolve_to_ipv4(url: str) -> str:
+    """Replace hostname in DATABASE_URL with its IPv4 address to avoid IPv6 issues."""
+    parsed = urlparse(url)
+    hostname = parsed.hostname
+    try:
+        ipv4 = socket.getaddrinfo(hostname, None, socket.AF_INET)[0][4][0]
+        # Replace hostname with IPv4 IP, keep port
+        port = parsed.port or 5432
+        new_netloc = f"{parsed.username}:{parsed.password}@{ipv4}:{port}"
+        resolved = urlunparse((parsed.scheme, new_netloc, parsed.path, parsed.params, parsed.query, parsed.fragment))
+        return resolved
+    except socket.gaierror:
+        return url
+
+
 def get_db_connection():
     """Create a new psycopg3 connection for pgvector queries."""
-    conn = psycopg.connect(os.environ["DATABASE_URL"].strip(), row_factory=dict_row)
+    db_url = _resolve_to_ipv4(os.environ["DATABASE_URL"].strip())
+    conn = psycopg.connect(db_url, row_factory=dict_row)
     return conn
 
 
