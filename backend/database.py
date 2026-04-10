@@ -5,10 +5,18 @@ and supabase-py for standard CRUD operations.
 """
 
 import os
+import socket
 import psycopg
 from psycopg.rows import dict_row
 import numpy as np
 from supabase import create_client, Client
+
+# Force IPv4 resolution for PostgreSQL connections
+_original_getaddrinfo = socket.getaddrinfo
+def _ipv4_only_getaddrinfo(*args, **kwargs):
+    responses = _original_getaddrinfo(*args, **kwargs)
+    return [r for r in responses if r[0] == socket.AF_INET] or responses
+socket.getaddrinfo = _ipv4_only_getaddrinfo
 
 # --- Supabase Client (for CRUD operations) ---
 
