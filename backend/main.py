@@ -91,6 +91,7 @@ app.include_router(wishlist.router)
 @app.get("/", tags=["Health"])
 async def root():
     """Health check endpoint."""
+    import os
     from models.bert_service import bert_service
     from models.classifier import classifier_service
     from models.ranker import ranker_service
@@ -105,6 +106,12 @@ async def root():
             "ranker": "loaded" if ranker_service._loaded else "not loaded",
             "intent": "loaded" if intent_service._loaded else "not loaded",
             "slot": "loaded" if slot_service._loaded else "not loaded",
+        },
+        "env_check": {
+            "SUPABASE_URL": "set" if os.environ.get("SUPABASE_URL") else "MISSING",
+            "SUPABASE_KEY": "set" if os.environ.get("SUPABASE_KEY") else "MISSING",
+            "DATABASE_URL": "set" if os.environ.get("DATABASE_URL") else "MISSING",
+            "JWT_SECRET": "set" if os.environ.get("JWT_SECRET") else "MISSING",
         },
     }
 
