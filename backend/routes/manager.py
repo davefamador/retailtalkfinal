@@ -73,19 +73,25 @@ async def manager_dashboard(manager: dict = Depends(require_manager)):
     daily_sales = {}
     weekly_sales = {}
     monthly_sales = {}
+    buyer_ids = set()
+    delivery_ids = set()
 
     if staff_ids:
         products = sb.table("products").select("id", count="exact").in_("seller_id", staff_ids).execute()
         total_products = products.count or 0
 
         # Revenue from transactions
-        txns = sb.table("product_transactions").select("amount, seller_amount, created_at, purchase_type").in_(
+        txns = sb.table("product_transactions").select("buyer_id, delivery_user_id, amount, seller_amount, created_at, purchase_type").in_(
             "seller_id", staff_ids
         ).in_("status", ["delivered", "completed"]).execute()
 
         for t in (txns.data or []):
             amt = float(t.get("seller_amount", 0))
             total_revenue += amt
+            if t.get("buyer_id"):
+                buyer_ids.add(t["buyer_id"])
+            if t.get("delivery_user_id"):
+                delivery_ids.add(t["delivery_user_id"])
 
             try:
                 dt = datetime.fromisoformat(t["created_at"].replace("Z", "+00:00"))
@@ -124,6 +130,10 @@ async def manager_dashboard(manager: dict = Depends(require_manager)):
         "daily_sales": to_list(daily_sales),
         "weekly_sales": to_list(weekly_sales),
         "monthly_sales": to_list(monthly_sales),
+        "store_buyers": len(buyer_ids),
+        "store_staff": staff.count or 0,
+        "store_managers": 1,
+        "store_delivery": len(delivery_ids),
     }
 
 

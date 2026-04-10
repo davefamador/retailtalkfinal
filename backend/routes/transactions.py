@@ -574,6 +574,12 @@ async def update_delivery_order_status(
         "group_id", group_id
     ).eq("status", "pending").execute()
 
+    # Fallback: group_id may actually be a single transaction's own id (no group_id set)
+    if not group_txns.data:
+        group_txns = sb.table("product_transactions").select("*").eq(
+            "id", group_id
+        ).eq("status", "pending").execute()
+
     if not group_txns.data:
         raise HTTPException(status_code=404, detail="No pending orders found in this group")
 
@@ -588,8 +594,14 @@ async def update_delivery_order_status(
             raise HTTPException(status_code=403, detail="Order does not belong to you")
 
     # Approve all pending transactions in the group
+    # Use group_id filter when available; fall back to id for single (ungrouped) orders
     update_data = {"status": "approved", "assigned_staff_id": user_id}
-    sb.table("product_transactions").update(update_data).eq("group_id", group_id).eq("status", "pending").execute()
+    actual_group_id = group_txns.data[0].get("group_id")
+    if actual_group_id:
+        sb.table("product_transactions").update(update_data).eq("group_id", actual_group_id).eq("status", "pending").execute()
+    else:
+        txn_ids = [t["id"] for t in group_txns.data]
+        sb.table("product_transactions").update(update_data).in_("id", txn_ids).eq("status", "pending").execute()
 
     return {"message": f"All orders in group approved and ready for delivery pickup"}
 
@@ -713,6 +725,12 @@ async def manager_update_delivery_order_status(
         "group_id", group_id
     ).eq("status", "pending").execute()
 
+    # Fallback: group_id may actually be a single transaction's own id (no group_id set)
+    if not group_txns.data:
+        group_txns = sb.table("product_transactions").select("*").eq(
+            "id", group_id
+        ).eq("status", "pending").execute()
+
     if not group_txns.data:
         raise HTTPException(status_code=404, detail="No pending orders found in this group")
 
@@ -726,8 +744,14 @@ async def manager_update_delivery_order_status(
             raise HTTPException(status_code=403, detail="Order does not belong to you")
 
     # Approve all pending transactions in the group
+    # Use group_id filter when available; fall back to id for single (ungrouped) orders
     update_data = {"status": "approved", "assigned_staff_id": user_id}
-    sb.table("product_transactions").update(update_data).eq("group_id", group_id).eq("status", "pending").execute()
+    actual_group_id = group_txns.data[0].get("group_id")
+    if actual_group_id:
+        sb.table("product_transactions").update(update_data).eq("group_id", actual_group_id).eq("status", "pending").execute()
+    else:
+        txn_ids = [t["id"] for t in group_txns.data]
+        sb.table("product_transactions").update(update_data).in_("id", txn_ids).eq("status", "pending").execute()
 
     return {"message": "All orders in group approved for delivery pickup"}
 
