@@ -8,13 +8,18 @@ from dotenv import load_dotenv
 
 load_dotenv(override=False)  # Don't override existing env vars (e.g. HF Space secrets)
 
-# Supabase
-SUPABASE_URL = os.getenv("SUPABASE_URL", "")
-SUPABASE_KEY = os.getenv("SUPABASE_KEY", "")
-SUPABASE_SERVICE_KEY = os.getenv("SUPABASE_SERVICE_KEY", "")
+# Supabase — read lazily at runtime so HF Space secrets are available
+def get_supabase_url(): return os.environ.get("SUPABASE_URL", "")
+def get_supabase_key(): return os.environ.get("SUPABASE_KEY", "")
+def get_supabase_service_key(): return os.environ.get("SUPABASE_SERVICE_KEY", "")
+def get_database_url(): return os.environ.get("DATABASE_URL", "")
+def get_jwt_secret(): return os.environ.get("JWT_SECRET", "change-this-in-production")
 
-# Database (direct connection for pgvector queries)
-DATABASE_URL = os.getenv("DATABASE_URL", "")
+# Keep these as constants too for backwards compatibility
+SUPABASE_URL = os.environ.get("SUPABASE_URL", "")
+SUPABASE_KEY = os.environ.get("SUPABASE_KEY", "")
+SUPABASE_SERVICE_KEY = os.environ.get("SUPABASE_SERVICE_KEY", "")
+DATABASE_URL = os.environ.get("DATABASE_URL", "")
 
 # JWT Auth
 JWT_SECRET = os.getenv("JWT_SECRET", "change-this-in-production")
