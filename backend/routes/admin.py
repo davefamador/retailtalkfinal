@@ -75,6 +75,7 @@ class TransactionDetail(BaseModel):
     purchase_type: str = "delivery"
     product_images: list = []
     created_at: str
+    delivery_user_name: Optional[str] = None
 
 
 class DailyIncome(BaseModel):
@@ -142,8 +143,10 @@ class AdminProductResponse(BaseModel):
 
 class AdminUpdateProductRequest(BaseModel):
     title: Optional[str] = None
+    description: Optional[str] = None
     price: Optional[float] = None
     stock: Optional[int] = None
+    images: Optional[list[str]] = None
     is_active: Optional[bool] = None
 
 
@@ -313,6 +316,29 @@ async def delete_user(user_id: str, admin: dict = Depends(require_admin)):
     return {"message": "User permanently deleted"}
 
 
+class ChangePasswordRequest(BaseModel):
+    new_password: str
+
+
+@router.put("/users/{user_id}/change-password")
+async def admin_change_user_password(user_id: str, req: ChangePasswordRequest, admin: dict = Depends(require_admin)):
+    """Admin changes any user's password."""
+    import bcrypt
+    sb = get_supabase()
+
+    if len(req.new_password) < 6:
+        raise HTTPException(status_code=400, detail="Password must be at least 6 characters")
+
+    target = sb.table("users").select("role").eq("id", user_id).execute()
+    if not target.data:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    password_hash = bcrypt.hashpw(req.new_password.encode("utf-8"), bcrypt.gensalt()).decode("utf-8")
+    sb.table("users").update({"password_hash": password_hash}).eq("id", user_id).execute()
+
+    return {"message": "Password updated successfully"}
+
+
 @router.get("/transactions", response_model=list[TransactionDetail])
 async def list_transactions(
     search: str = Query("", description="Search by buyer or seller name"),
@@ -379,9 +405,13 @@ async def list_transactions(
 
     # Get all user IDs we need names for
     user_ids = set()
+    delivery_user_ids = set()
     for t in txns.data:
         user_ids.add(t["buyer_id"])
         user_ids.add(t["seller_id"])
+        if t.get("delivery_user_id"):
+            delivery_user_ids.add(t["delivery_user_id"])
+            user_ids.add(t["delivery_user_id"])
 
     users_result = sb.table("users").select("id, full_name, department_id").in_("id", list(user_ids)).execute()
     user_map = {u["id"]: u for u in users_result.data} if users_result.data else {}
@@ -425,6 +455,9 @@ async def list_transactions(
         if t.get("products") and isinstance(t["products"], dict):
             product_images = t["products"].get("images", []) or []
 
+        delivery_uid = t.get("delivery_user_id")
+        delivery_user_name = user_map.get(delivery_uid, {}).get("full_name") if delivery_uid else None
+
         results.append(TransactionDetail(
             id=t["id"],
             buyer_name=buyer_name,
@@ -439,6 +472,7 @@ async def list_transactions(
             purchase_type=t.get("purchase_type", "delivery"),
             product_images=product_images,
             created_at=t["created_at"],
+            delivery_user_name=delivery_user_name,
         ))
 
     return results
@@ -697,7 +731,7 @@ async def admin_update_product(
     if not existing.data:
         raise HTTPException(status_code=404, detail="Product not found")
 
-    update_data = {k: v for k, v in req.model_dump().items() if v is not None}
+    update_data = {k: v for k, v in req.model_dump().items() if k in req.model_fields_set}
     if not update_data:
         raise HTTPException(status_code=400, detail="No fields to update")
 
@@ -1652,11 +1686,19 @@ class Deliveryman(BaseModel):
     avg_delivery_time: Optional[float] = None
     completed_count: int = 0
 
+class PickupHistoryItem(BaseModel):
+    transaction_id: str
+    deliveryman_name: str
+    amount: float
+    status: str
+    picked_up_at: str
+
 class DeliveriesStatsResponse(BaseModel):
     total_deliveries: int
     deliveries_by_day: list[dict]
     deliveries_by_month: list[dict]
     deliverymen: list[Deliveryman]
+    pickup_history: list[PickupHistoryItem]
 
 
 @router.get("/deliveries/stats", response_model=DeliveriesStatsResponse)
@@ -1684,7 +1726,8 @@ async def get_deliveries_stats(admin: dict = Depends(require_admin)):
             total_deliveries=0,
             deliveries_by_day=[],
             deliveries_by_month=[],
-            deliverymen=[]
+            deliverymen=[],
+            pickup_history=[]
         )
 
     # Get deliveryman contact info
@@ -1753,6 +1796,8 @@ async def get_deliveries_stats(admin: dict = Depends(require_admin)):
     days_list = list(days_dict.values())
     months_list = list(months_dict.values())
 
+    pickup_history = []
+
     # Build deliverymen list
     deliverymen_list = []
     for user_id, data in deliverymen_map.items():
@@ -1765,11 +1810,25 @@ async def get_deliveries_stats(admin: dict = Depends(require_admin)):
             completed_count=data["completed_count"]
         ))
 
+    for t in txns.data:
+        if t.get("delivery_user_id") and t.get("picked_up_at"):
+            dm_name = deliverymen_map[t["delivery_user_id"]]["full_name"] if t["delivery_user_id"] in deliverymen_map else "Unknown"
+            pickup_history.append(PickupHistoryItem(
+                transaction_id=t["id"],
+                deliveryman_name=dm_name,
+                amount=float(t.get("amount", 0)),
+                status=t.get("status", ""),
+                picked_up_at=t["picked_up_at"]
+            ))
+
+    pickup_history.sort(key=lambda x: x.picked_up_at, reverse=True)
+
     return DeliveriesStatsResponse(
         total_deliveries=len(txns.data),
         deliveries_by_day=days_list,
         deliveries_by_month=months_list,
-        deliverymen=deliverymen_list
+        deliverymen=deliverymen_list,
+        pickup_history=pickup_history[:100]
     )
 
 

@@ -314,15 +314,18 @@ async def pick_order(group_id: str, delivery_user: dict = Depends(require_delive
             raise HTTPException(status_code=400, detail="This order group is already assigned to another delivery user")
 
     # Assign all transactions in group to delivery user
+    now_str = datetime.now(timezone.utc).isoformat()
     if used_fallback:
         sb.table("product_transactions").update({
             "delivery_user_id": user_id,
             "status": "ondeliver",
+            "picked_up_at": now_str,
         }).eq("id", group_id).execute()
     else:
         sb.table("product_transactions").update({
             "delivery_user_id": user_id,
             "status": "ondeliver",
+            "picked_up_at": now_str,
         }).eq("group_id", group_id).execute()
 
     return {"message": "Order group picked up! Deliver all items to the buyer."}
