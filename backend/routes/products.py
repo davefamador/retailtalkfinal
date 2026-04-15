@@ -293,7 +293,7 @@ async def get_product(product_id: str):
 
 @router.put("/{product_id}", response_model=ProductResponse)
 async def update_product(product_id: str, req: UpdateProductRequest, current_user: dict = Depends(get_current_user)):
-    """Update a product. Only the owner can update."""
+    """Update a product. Only the owner (seller) can update."""
     sb = get_supabase()
 
     # Verify ownership
@@ -303,8 +303,8 @@ async def update_product(product_id: str, req: UpdateProductRequest, current_use
     if existing.data[0]["seller_id"] != current_user["sub"]:
         raise HTTPException(status_code=403, detail="Not your product")
 
-    # Build update dict (only non-None fields)
-    update_data = {k: v for k, v in req.model_dump().items() if v is not None}
+    # Build update dict — use model_fields_set so falsy values (False, 0) are not dropped
+    update_data = {k: v for k, v in req.model_dump().items() if k in req.model_fields_set}
     if not update_data:
         raise HTTPException(status_code=400, detail="No fields to update")
 

@@ -451,7 +451,7 @@ async def get_staff_detail(user_id: str, manager: dict = Depends(require_manager
 
 @router.get("/restock-requests")
 async def get_restock_requests(
-    status: str = Query("pending_manager", description="Filter by status"),
+    status: str = Query("", description="Filter by status. Empty returns all."),
     manager: dict = Depends(require_manager),
 ):
     """Get restock requests for the manager's department."""
@@ -559,6 +559,73 @@ async def reject_restock(
     return {"message": "Restock request rejected"}
 
 
+class ChangePasswordRequest(BaseModel):
+    new_password: str
+
+
+@router.put("/staff/{user_id}/change-password")
+async def manager_change_staff_password(user_id: str, req: ChangePasswordRequest, manager: dict = Depends(require_manager)):
+    """Manager changes a staff member's password."""
+    import bcrypt
+    sb = get_supabase()
+    dept_id = manager.get("department_id")
+
+    if len(req.new_password) < 6:
+        raise HTTPException(status_code=400, detail="Password must be at least 6 characters")
+
+    # Verify user belongs to this manager's department
+    target = sb.table("users").select("id, role, department_id").eq("id", user_id).execute()
+    if not target.data:
+        raise HTTPException(status_code=404, detail="User not found")
+    if target.data[0].get("department_id") != dept_id:
+        raise HTTPException(status_code=403, detail="This user is not in your department")
+
+    password_hash = bcrypt.hashpw(req.new_password.encode("utf-8"), bcrypt.gensalt()).decode("utf-8")
+    sb.table("users").update({"password_hash": password_hash}).eq("id", user_id).execute()
+
+    return {"message": "Password updated successfully"}
+
+
+class RestockDirectRequest(BaseModel):
+    product_id: str
+    quantity: int
+    notes: str = ""
+
+
+@router.post("/restock-direct")
+async def create_restock_direct(req: RestockDirectRequest, manager: dict = Depends(require_manager)):
+    """Manager directly creates a restock request pre-approved for delivery queue."""
+    sb = get_supabase()
+    user_id = manager["sub"]
+    dept_id = manager.get("department_id")
+
+    if not dept_id:
+        raise HTTPException(status_code=400, detail="You are not assigned to a department")
+    if req.quantity < 1:
+        raise HTTPException(status_code=400, detail="Quantity must be at least 1")
+
+    product = sb.table("products").select("id, seller_id").eq("id", req.product_id).execute()
+    if not product.data:
+        raise HTTPException(status_code=404, detail="Product not found")
+
+    result = sb.table("restock_requests").insert({
+        "staff_id": user_id,
+        "department_id": dept_id,
+        "product_id": req.product_id,
+        "requested_quantity": req.quantity,
+        "approved_quantity": req.quantity,
+        "notes": req.notes,
+        "status": "approved_manager",
+        "manager_approved_at": datetime.now(timezone.utc).isoformat(),
+        "manager_notes": "Direct restock order by manager",
+    }).execute()
+
+    if not result.data:
+        raise HTTPException(status_code=500, detail="Failed to create restock request")
+
+    return {"message": "Restock order sent to delivery queue", "request": result.data[0]}
+
+
 # --- Department Products & Transactions ---
 
 @router.get("/products")
@@ -613,6 +680,33 @@ async def list_department_products(
         }
         for p in (result.data or [])
     ]
+
+
+@router.put("/products/{product_id}")
+async def update_department_product(product_id: str, req: dict, manager: dict = Depends(require_manager)):
+    """Update a product in the manager's department (images, title, price, etc.)."""
+    sb = get_supabase()
+    dept_id = manager.get("department_id")
+
+    # Get all seller IDs in this department + manager themselves
+    staff_result = sb.table("users").select("id").eq("department_id", dept_id).eq("role", "seller").execute()
+    allowed_ids = [s["id"] for s in (staff_result.data or [])]
+    allowed_ids.append(manager["sub"])
+
+    existing = sb.table("products").select("seller_id").eq("id", product_id).execute()
+    if not existing.data:
+        raise HTTPException(status_code=404, detail="Product not found")
+    if existing.data[0]["seller_id"] not in allowed_ids:
+        raise HTTPException(status_code=403, detail="Product not in your department")
+
+    update_data = {k: v for k, v in req.items() if k is not None}
+    if not update_data:
+        raise HTTPException(status_code=400, detail="No update data provided")
+
+    result = sb.table("products").update(update_data).eq("id", product_id).execute()
+    if not result.data:
+        raise HTTPException(status_code=500, detail="Update failed")
+    return {"message": "Product updated successfully"}
 
 
 @router.get("/transactions")
