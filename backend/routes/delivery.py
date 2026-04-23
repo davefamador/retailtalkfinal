@@ -14,7 +14,7 @@ from datetime import datetime, timedelta, timezone
 router = APIRouter(prefix="/delivery", tags=["Delivery"])
 
 MAX_ACTIVE_DELIVERIES = 5
-DELIVERY_FEE = 90.00
+DELIVERY_FEE = 40.00
 
 
 # --- Helpers ---
