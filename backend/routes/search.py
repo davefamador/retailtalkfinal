@@ -166,11 +166,17 @@ def _run_search_pipeline(
     """
     query_embedding = bert_service.compute_embedding(search_text)
 
-    if filters:
+    # Log brand detection — brand is embedded in search_text by query rewriter;
+    # no ILIKE hard filter is used (would over-aggressively exclude results).
+    if filters.get("brand"):
+        print(f"[Search]   Brand slot='{filters['brand']}' — handled via BERT embedding, not SQL filter")
+
+    # Only price is used as a hard DB filter; brand/color are semantic (BERT)
+    has_price_filter = filters.get("price_min") is not None or filters.get("price_max") is not None
+    if has_price_filter:
         raw_candidates = search_similar_products_filtered(
             query_embedding, top_k=max_candidates,
             price_min=filters.get("price_min"), price_max=filters.get("price_max"),
-            brand=filters.get("brand"), color=filters.get("color"),
         )
     else:
         raw_candidates = search_similar_products(query_embedding, top_k=max_candidates)
@@ -209,7 +215,7 @@ def _run_search_pipeline(
     else:
         w_r, w_c, w_s = 0.0, 0.05, 0.95
 
-    MIN_RELEVANCE_SCORE = 0.75
+    MIN_RELEVANCE_SCORE = 0.70
     scored = []
     for idx, (cand, cls) in enumerate(zip(candidates, classifications)):
         label = cls["label"]

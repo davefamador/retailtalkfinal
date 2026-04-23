@@ -1,7 +1,7 @@
 """
 Authentication routes — register, login, get current user.
 Uses JWT tokens and bcrypt password hashing.
-Roles: buyer, seller, admin
+Roles: buyer, staff, admin
 """
 
 from fastapi import APIRouter, HTTPException, Depends
@@ -24,7 +24,7 @@ class RegisterRequest(BaseModel):
     email: str
     password: str
     full_name: str
-    role: str = "buyer"  # buyer or seller only
+    role: str = "buyer"  # buyer or staff only
 
 
 class LoginRequest(BaseModel):
@@ -81,10 +81,10 @@ get_current_user = verify_token
 
 @router.post("/register", response_model=TokenResponse)
 async def register(req: RegisterRequest):
-    """Register a new user account. Role must be 'buyer' or 'seller'."""
+    """Register a new user account. Role must be 'buyer' or 'staff'."""
     # Validate role
-    if req.role not in ("buyer", "seller", "delivery"):
-        raise HTTPException(status_code=400, detail="Role must be 'buyer', 'seller', or 'delivery'")
+    if req.role not in ("buyer", "staff", "delivery"):
+        raise HTTPException(status_code=400, detail="Role must be 'buyer', 'staff', or 'delivery'")
 
     sb = get_supabase()
 

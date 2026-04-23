@@ -16,11 +16,11 @@ router = APIRouter(prefix="/restock", tags=["Restock"])
 # --- Helpers ---
 
 async def require_seller(current_user: dict = Depends(get_current_user)):
-    """Ensure the current user is a seller (staff)."""
+    """Ensure the current user is a staff member."""
     sb = get_supabase()
     result = sb.table("users").select("role, department_id").eq("id", current_user["sub"]).execute()
-    if not result.data or result.data[0].get("role") != "seller":
-        raise HTTPException(status_code=403, detail="Staff/seller access required")
+    if not result.data or result.data[0].get("role") != "staff":
+        raise HTTPException(status_code=403, detail="Staff access required")
     current_user["department_id"] = result.data[0].get("department_id")
     return current_user
 

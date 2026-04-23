@@ -127,37 +127,35 @@ def search_similar_products_filtered(
     top_k: int = 50,
     price_min: float = None,
     price_max: float = None,
-    brand: str = None,
-    color: str = None,
+    brand: str = None,   # kept in signature for backward compat; no longer a hard SQL filter
+    color: str = None,   # kept in signature for backward compat; no longer a hard SQL filter
 ):
     """
-    Find the top_k most similar products with optional structured filters.
-    Extends search_similar_products with WHERE clauses from query rewriting.
+    Find the top_k most similar products with optional price filters.
+
+    Brand and color are intentionally NOT used as hard SQL filters.
+    They are already embedded into the BERT search text by the query rewriter,
+    so pgvector + CrossEncoder rank brand-matching products naturally.
+    Applying an ILIKE hard filter for brand would aggressively exclude products
+    whose listings use different brand spellings or abbreviations.
+    Post-filter by relevance_score threshold in the search pipeline instead.
     """
     conn = get_db_connection()
     embedding_str = embedding_to_pgvector(query_embedding)
     
-    # Build dynamic WHERE clause
+    # Build dynamic WHERE clause — only hard constraints (price)
     conditions = ["is_active = true", "status = 'approved'", "stock > 0", "embedding IS NOT NULL"]
     filter_params = []
 
     if price_min is not None:
-        conditions.append(f"price > %s")
+        conditions.append("price > %s")
         filter_params.append(price_min)
 
     if price_max is not None:
-        conditions.append(f"price < %s")
+        conditions.append("price < %s")
         filter_params.append(price_max)
 
-    if brand:
-        conditions.append(f"(title ILIKE %s OR description ILIKE %s)")
-        filter_params.append(f"%{brand}%")
-        filter_params.append(f"%{brand}%")
-
-    if color:
-        conditions.append(f"(title ILIKE %s OR description ILIKE %s)")
-        filter_params.append(f"%{color}%")
-        filter_params.append(f"%{color}%")
+    # brand / color: handled by BERT embedding + CrossEncoder, not SQL ILIKE
 
     where_clause = " AND ".join(conditions)
 

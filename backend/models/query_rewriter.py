@@ -116,94 +116,95 @@ def _merge_rewritten_queries(
     sub_queries: list[RewrittenQuery],
     original_query: str,
 ) -> RewrittenQuery:
-    """Merge multiple per-sentence RewrittenQuery results into one."""
-    if len(sub_queries) == 1:
-        rq = sub_queries[0]
-        rq.search_groups = [SearchGroup(search_text=rq.search_text, filters=rq.filters)]
-        return rq
+    """Merge multiple per-sentence RewrittenQuery results into one.
+
+    A sub-query may already carry multiple search_groups (when the NER found
+    2+ product slots inside a single sentence).  We always flatten all groups
+    from all sub-queries before deciding whether the result is compound.
+    """
+    # ── Flatten every sub-query's search_groups ──────────────────────────────
+    # A sub-query with search_groups already set (multi-product rewrite path)
+    # contributes those groups directly; otherwise it contributes one group
+    # from its own search_text + filters.
+    def _groups_for(rq: RewrittenQuery) -> list[SearchGroup]:
+        if rq.search_groups:
+            return rq.search_groups
+        return [SearchGroup(search_text=rq.search_text, filters=rq.filters)]
+
+    all_groups: list[SearchGroup] = []
+    for rq in sub_queries:
+        all_groups.extend(_groups_for(rq))
+
+    # Deduplicate groups with the exact same search_text+filters
+    seen_groups: dict[str, SearchGroup] = {}
+    for g in all_groups:
+        key = f"{g.search_text}|{sorted(g.filters.items())}"
+        if key not in seen_groups:
+            seen_groups[key] = g
+    all_groups = list(seen_groups.values())
+
+    # ── Propagate shared price filter to all groups ───────────────────────────
+    # When the user writes "food and toys less than 20", splitting produces one
+    # group with price_max=20 and another with none.  Since only a single unique
+    # price value appears across all groups, treat it as a global constraint and
+    # apply it to every group.
+    # (If each group already has its OWN distinct value — e.g.
+    #  "shoes under 300 and bags under 500" — we leave them independent.)
+    price_maxes = {g.filters["price_max"] for g in all_groups if "price_max" in g.filters}
+    price_mins  = {g.filters["price_min"] for g in all_groups if "price_min" in g.filters}
+
+    if len(price_maxes) == 1:
+        shared_max = next(iter(price_maxes))
+        for g in all_groups:
+            g.filters["price_max"] = shared_max
+        print(f"[QueryRewriter] Shared price_max={shared_max} applied to all {len(all_groups)} groups")
+
+    if len(price_mins) == 1:
+        shared_min = next(iter(price_mins))
+        for g in all_groups:
+            g.filters["price_min"] = shared_min
+        print(f"[QueryRewriter] Shared price_min={shared_min} applied to all {len(all_groups)} groups")
 
     # Union of all intents (deduplicated, preserving order)
     merged_intents = list(dict.fromkeys(
         intent for rq in sub_queries for intent in rq.intents
     ))
 
-    # Each sub-query that originated from a separator (dot, comma, 'and') represents
-    # a distinct product search — always keep them as independent search groups.
-    # We only collapse to a single group when all sub-queries share the same search
-    # text (i.e., splitting produced no meaningful separation).
-    distinct_texts = len({rq.search_text for rq in sub_queries}) > 1
+    # ── SINGLE effective group ────────────────────────────────────────────────
+    if len(all_groups) == 1:
+        rq = sub_queries[0]
+        rq.search_groups = all_groups
+        rq.original_query = original_query
+        return rq
 
-    if distinct_texts:
-        # ── COMPOUND QUERY ──
-        # Each sub-query becomes its own SearchGroup with independent filters.
-        search_groups = [
-            SearchGroup(search_text=rq.search_text, filters=rq.filters)
-            for rq in sub_queries
-        ]
-        merged_slots = {}
-        product_idx = 1
-        for rq in sub_queries:
-            for key, value in rq.slots.items():
-                if key in ("PRODUCT1", "PRODUCT2"):
-                    slot_key = f"PRODUCT{product_idx}"
-                    if slot_key not in merged_slots:
-                        merged_slots[slot_key] = value
-                        product_idx += 1
-                elif key not in merged_slots:
-                    merged_slots[key] = value
-        search_text = " | ".join(g.search_text for g in search_groups)
-        return RewrittenQuery(
-            search_text=search_text,
-            filters={},
-            original_query=original_query,
-            intents=merged_intents,
-            slots=merged_slots,
-            is_rewritten=True,
-            search_groups=search_groups,
-        )
-
-    # ── SINGLE GROUP (original merge behavior) ──
-    merged_slots = {}
+    # ── MULTIPLE effective groups — compound / multi-product query ────────────
+    merged_slots: dict = {}
+    product_idx = 1
     for rq in sub_queries:
         for key, value in rq.slots.items():
-            if key in ("PRODUCT1", "PRODUCT2"):
-                if "PRODUCT1" not in merged_slots:
-                    merged_slots["PRODUCT1"] = value
-                elif "PRODUCT2" not in merged_slots:
-                    merged_slots["PRODUCT2"] = value
+            base = key.rstrip("0123456789")
+            if base == "PRODUCT":
+                slot_key = f"PRODUCT{product_idx}"
+                if slot_key not in merged_slots:
+                    merged_slots[slot_key] = value
+                    product_idx += 1
             elif key not in merged_slots:
                 merged_slots[key] = value
 
-    merged_filters = {}
-    for rq in sub_queries:
-        for key, value in rq.filters.items():
-            if key not in merged_filters:
-                merged_filters[key] = value
-            elif key == "price_min":
-                merged_filters[key] = max(merged_filters[key], value)
-            elif key == "price_max":
-                merged_filters[key] = min(merged_filters[key], value)
-            elif key == "rating_min":
-                merged_filters[key] = max(merged_filters[key], value)
+    # Multiple distinct search groups always means a multi-search
+    if "multi_search" not in merged_intents:
+        merged_intents.insert(0, "multi_search")
+    merged_intents = [i for i in merged_intents if i != "single_search"]
 
-    seen = set()
-    search_parts = []
-    for rq in sub_queries:
-        for word in rq.search_text.split():
-            lower = word.lower()
-            if lower not in seen:
-                seen.add(lower)
-                search_parts.append(word)
-    search_text = " ".join(search_parts)
-
+    search_text = " | ".join(g.search_text for g in all_groups)
     return RewrittenQuery(
         search_text=search_text,
-        filters=merged_filters,
+        filters={},
         original_query=original_query,
         intents=merged_intents,
         slots=merged_slots,
-        is_rewritten=any(rq.is_rewritten for rq in sub_queries),
-        search_groups=[SearchGroup(search_text=search_text, filters=merged_filters)],
+        is_rewritten=True,
+        search_groups=all_groups,
     )
 
 
@@ -269,14 +270,14 @@ def rewrite(query: str, intents: list[str], slots: dict) -> RewrittenQuery:
         slots=slots,
     )
 
-    # If no intents or slots were extracted, return original query
-    if not intents and not slots:
-        return result
-
     # Free-form intent with no product slots: pass through as-is
     # (e.g., "pano magluto ng adobo" — not a product search)
     if "free_form" in intents and len(intents) == 1 and not slots:
         return result
+
+    # NOTE: we no longer early-return when intents/slots are both empty.
+    # Always apply modifier-word stripping so noisy fragments like
+    # "i want food" are cleaned to "food" before BERT embedding.
 
     # --- Correct price slot direction ---
     # The NER model may tag the price value as PRICE_MAX when the user
@@ -341,12 +342,40 @@ def rewrite(query: str, intents: list[str], slots: dict) -> RewrittenQuery:
             filters["rating_min"] = parsed
 
     # --- Build search text ---
-    search_parts = []
+    # Collect all detected product slots (PRODUCT1, PRODUCT2, PRODUCT3, …)
+    product_slots = [
+        slots[k].strip()
+        for k in sorted(slots.keys())
+        if k.startswith("PRODUCT") and slots[k].strip()
+    ]
 
-    # Include product names
-    for slot_type in ["PRODUCT1", "PRODUCT2"]:
-        if slot_type in slots:
-            search_parts.append(slots[slot_type].strip())
+    # ── MULTI-PRODUCT in a single sub-sentence ──────────────────────────────
+    # If the NER detected 2+ distinct product slots within the same sentence
+    # (e.g. "i want food and toys less than 20" arriving unsplit), build a
+    # multi-group RewrittenQuery so each product gets its own search pipeline.
+    # Shared filters (price, brand, color) are applied to every group.
+    if len(product_slots) >= 2:
+        search_groups = [
+            SearchGroup(search_text=p, filters=dict(filters))  # copy filters to each group
+            for p in product_slots
+        ]
+        intents_out = list(intents)
+        if "multi_search" not in intents_out:
+            intents_out.insert(0, "multi_search")
+        intents_out = [i for i in intents_out if i != "single_search"]
+        print(f"[QueryRewriter] Multi-product in single sentence: {product_slots} | filters={filters}")
+        return RewrittenQuery(
+            search_text=" | ".join(product_slots),
+            filters=filters,
+            original_query=query.strip(),
+            intents=intents_out,
+            slots=slots,
+            is_rewritten=True,
+            search_groups=search_groups,
+        )
+
+    # ── SINGLE PRODUCT (or filtered multi-product) ──────────────────────────
+    search_parts = list(product_slots)  # already stripped
 
     # Include brand in search text (helps BERT + keyword matching)
     if brand:
@@ -360,8 +389,9 @@ def rewrite(query: str, intents: list[str], slots: dict) -> RewrittenQuery:
     if search_parts:
         search_text = " ".join(search_parts)
     else:
-        # No product slots found — clean the original query
-        # Remove modifier words and price values
+        # No product slots found — clean the original query.
+        # Always strip modifier words (even when no intents/slots were found)
+        # so fragments like "i want food" become "food" for BERT embedding.
         words = query.strip().split()
         cleaned = [
             w for w in words
@@ -407,7 +437,10 @@ class QueryRewriterService:
             # Single sentence: no splitting overhead
             result = self._process_single(sentences[0])
             result.original_query = query.strip()
-            result.search_groups = [SearchGroup(search_text=result.search_text, filters=result.filters)]
+            # Preserve multi-product groups built by rewrite(); only fall back
+            # to a single group when rewrite() didn't produce any groups.
+            if not result.search_groups:
+                result.search_groups = [SearchGroup(search_text=result.search_text, filters=result.filters)]
             self._log(query, result)
             return result
 

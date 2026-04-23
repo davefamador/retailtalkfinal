@@ -149,7 +149,7 @@ async def get_seller_wishlist_report(current_user: dict = Depends(get_current_us
     if user_info.data and user_info.data[0].get("role") == "manager":
         dept_id = user_info.data[0].get("department_id")
         if dept_id:
-            dept_users = sb.table("users").select("id").eq("department_id", dept_id).eq("role", "seller").execute()
+            dept_users = sb.table("users").select("id").eq("department_id", dept_id).eq("role", "staff").execute()
             for du in (dept_users.data or []):
                 if du["id"] not in seller_ids:
                     seller_ids.append(du["id"])

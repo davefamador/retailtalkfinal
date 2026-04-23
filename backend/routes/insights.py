@@ -29,7 +29,7 @@ async def log_prompt(req: PromptRequest, current_user: dict = Depends(get_curren
 @router.get("/seller")
 async def get_seller_insights(current_user: dict = Depends(get_current_user)):
     """Dynamic NLP Insights for Seller Dashboard using global search prompts."""
-    if current_user.get("role") != "seller" and current_user.get("role") != "admin":
+    if current_user.get("role") != "staff" and current_user.get("role") != "admin":
         # Note: Depending on rules, we might allow admin to see this too
         # But we'll enforce just basic checking here.
         pass
