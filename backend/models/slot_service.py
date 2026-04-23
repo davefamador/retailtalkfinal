@@ -169,7 +169,15 @@ class SlotService:
         """
         Merge BIO-tagged tokens into a slot dictionary.
 
+        For PRODUCT slots, each new B-PRODUCT1 span (after the first) is assigned
+        to the next available PRODUCT slot key (PRODUCT2, PRODUCT3, …) instead of
+        being concatenated, so that compound queries like "food and school" produce
+        two independent product slots rather than one merged value.
+
         Example:
+            [("food", "B-PRODUCT1"), ("and", "O"), ("school", "B-PRODUCT1")]
+            -> {"PRODUCT1": "food", "PRODUCT2": "school"}
+
             [("blue", "B-COLOR"), ("Nike", "B-BRAND"), ("running", "B-PRODUCT1"),
              ("shoes", "I-PRODUCT1")]
             -> {"COLOR": "blue", "BRAND": "Nike", "PRODUCT1": "running shoes"}
@@ -177,19 +185,33 @@ class SlotService:
         slots = {}
         current_entity = None
         current_tokens = []
+        # Track how many times each base product slot type has been seen so we can
+        # auto-increment the slot index (PRODUCT1 -> PRODUCT2 -> PRODUCT3 …).
+        product_counts: dict = {}   # e.g. {"PRODUCT": 2} means PRODUCT1 already used
+
+        def _save_entity(entity: str, tokens: list):
+            """Save a completed entity span into `slots`, handling PRODUCT auto-index."""
+            slot_value = " ".join(tokens)
+            # Detect PRODUCT-type slots (PRODUCT1, PRODUCT2, …) and auto-index them
+            base = entity.rstrip("0123456789")  # e.g. "PRODUCT1" -> "PRODUCT"
+            if base == "PRODUCT":
+                count = product_counts.get(base, 0) + 1
+                product_counts[base] = count
+                slot_key = f"PRODUCT{count}"
+            else:
+                slot_key = entity
+                # For non-product slots, fall back to concatenation (preserves old
+                # behaviour for BRAND, COLOR, etc.)
+                if slot_key in slots:
+                    slots[slot_key] += " " + slot_value
+                    return
+            slots[slot_key] = slot_value
 
         for word, tag in tagged_tokens:
             if tag.startswith("B-"):
-                # Save previous entity
+                # Save previous entity before starting a new one
                 if current_entity and current_tokens:
-                    slot_key = current_entity
-                    slot_value = " ".join(current_tokens)
-                    # Handle multiple entities of same type (e.g., PRODUCT1, PRODUCT2)
-                    if slot_key in slots:
-                        slots[slot_key] += " " + slot_value
-                    else:
-                        slots[slot_key] = slot_value
-
+                    _save_entity(current_entity, current_tokens)
                 current_entity = tag[2:]  # Strip "B-"
                 current_tokens = [word]
 
@@ -200,34 +222,19 @@ class SlotService:
                 else:
                     # Mismatched I-tag: save current, start new
                     if current_entity and current_tokens:
-                        slot_key = current_entity
-                        slot_value = " ".join(current_tokens)
-                        if slot_key in slots:
-                            slots[slot_key] += " " + slot_value
-                        else:
-                            slots[slot_key] = slot_value
+                        _save_entity(current_entity, current_tokens)
                     current_entity = entity_type
                     current_tokens = [word]
             else:
                 # O tag: save current entity
                 if current_entity and current_tokens:
-                    slot_key = current_entity
-                    slot_value = " ".join(current_tokens)
-                    if slot_key in slots:
-                        slots[slot_key] += " " + slot_value
-                    else:
-                        slots[slot_key] = slot_value
+                    _save_entity(current_entity, current_tokens)
                 current_entity = None
                 current_tokens = []
 
-        # Save last entity
+        # Save the last entity
         if current_entity and current_tokens:
-            slot_key = current_entity
-            slot_value = " ".join(current_tokens)
-            if slot_key in slots:
-                slots[slot_key] += " " + slot_value
-            else:
-                slots[slot_key] = slot_value
+            _save_entity(current_entity, current_tokens)
 
         return slots
 

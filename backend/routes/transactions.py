@@ -276,7 +276,7 @@ async def get_transaction_history(current_user: dict = Depends(get_current_user)
 
     # For sellers/managers in a department, also include department-wide transactions
     user_info = sb.table("users").select("role, department_id").eq("id", user_id).execute()
-    if user_info.data and user_info.data[0].get("role") in ("seller", "manager") and user_info.data[0].get("department_id"):
+    if user_info.data and user_info.data[0].get("role") in ("staff", "manager") and user_info.data[0].get("department_id"):
         dept_id = user_info.data[0]["department_id"]
         dept_staff = sb.table("users").select("id").eq("department_id", dept_id).execute()
         dept_ids = [s["id"] for s in (dept_staff.data or [])]
@@ -479,8 +479,8 @@ async def get_staff_delivery_orders(current_user: dict = Depends(get_current_use
 
     # Verify seller role and get department
     user = sb.table("users").select("role, department_id").eq("id", user_id).execute()
-    if not user.data or user.data[0]["role"] not in ("seller", "manager"):
-        raise HTTPException(status_code=403, detail="Only sellers/managers can view delivery orders")
+    if not user.data or user.data[0]["role"] not in ("staff", "manager"):
+        raise HTTPException(status_code=403, detail="Only staff/managers can view delivery orders")
 
     dept_id = user.data[0].get("department_id")
 
@@ -563,7 +563,7 @@ async def update_delivery_order_status(
 
     # Verify staff role and get department
     user = sb.table("users").select("role, department_id").eq("id", user_id).execute()
-    if not user.data or user.data[0]["role"] not in ("seller", "manager"):
+    if not user.data or user.data[0]["role"] not in ("staff", "manager"):
         raise HTTPException(status_code=403, detail="Access denied")
 
     dept_id = user.data[0].get("department_id")
@@ -618,7 +618,7 @@ async def get_manager_delivery_orders(current_user: dict = Depends(get_current_u
         raise HTTPException(status_code=404, detail="User not found")
 
     user_data = user.data[0]
-    if user_data["role"] not in ("seller", "manager"):
+    if user_data["role"] not in ("staff", "manager"):
         raise HTTPException(status_code=403, detail="Access denied")
 
     dept_id = user_data.get("department_id")
@@ -709,7 +709,7 @@ async def manager_update_delivery_order_status(
 
     # Get manager's department
     user = sb.table("users").select("role, department_id").eq("id", user_id).execute()
-    if not user.data or user.data[0]["role"] not in ("seller", "manager"):
+    if not user.data or user.data[0]["role"] not in ("staff", "manager"):
         raise HTTPException(status_code=403, detail="Access denied")
 
     dept_id = user.data[0].get("department_id")
@@ -917,7 +917,7 @@ async def get_salary_history(current_user: dict = Depends(get_current_user)):
     user = sb.table("users").select("role, salary").eq("id", user_id).execute()
     if not user.data:
         raise HTTPException(status_code=404, detail="User not found")
-    if user.data[0]["role"] not in ("seller", "manager"):
+    if user.data[0]["role"] not in ("staff", "manager"):
         raise HTTPException(status_code=403, detail="Only staff and managers can view salary history")
 
     fixed_salary = float(user.data[0].get("salary", 0))

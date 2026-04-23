@@ -59,10 +59,10 @@ async def manager_dashboard(manager: dict = Depends(require_manager)):
     dept_info = dept.data[0] if dept.data else {}
 
     # Staff count
-    staff = sb.table("users").select("id", count="exact").eq("department_id", dept_id).eq("role", "seller").execute()
+    staff = sb.table("users").select("id", count="exact").eq("department_id", dept_id).eq("role", "staff").execute()
 
     # Products in department (via staff + manager themselves)
-    staff_ids_result = sb.table("users").select("id").eq("department_id", dept_id).eq("role", "seller").execute()
+    staff_ids_result = sb.table("users").select("id").eq("department_id", dept_id).eq("role", "staff").execute()
     staff_ids = [s["id"] for s in (staff_ids_result.data or [])]
     manager_id = manager["sub"]
     if manager_id not in staff_ids:
@@ -151,7 +151,7 @@ async def list_staff(
 
     query = sb.table("users").select("*").eq(
         "department_id", dept_id
-    ).eq("role", "seller")
+    ).eq("role", "staff")
 
     if search:
         query = query.or_(f"full_name.ilike.%{search}%,email.ilike.%{search}%")
@@ -254,7 +254,7 @@ async def register_staff(req: StaffRegisterRequest, manager: dict = Depends(requ
             "email": req.email,
             "password_hash": password_hash,
             "full_name": req.full_name,
-            "role": "seller",
+            "role": "staff",
             "is_banned": False,
             "department_id": dept_id,
             "manager_id": manager_id,
@@ -275,7 +275,7 @@ async def register_staff(req: StaffRegisterRequest, manager: dict = Depends(requ
                 "id": user["id"],
                 "full_name": user["full_name"],
                 "email": user["email"],
-                "role": "seller",
+                "role": "staff",
                 "department_id": dept_id,
                 "contact_number": req.contact_number,
             },
@@ -559,6 +559,38 @@ async def reject_restock(
     return {"message": "Restock request rejected"}
 
 
+class RestockCancelRequest(BaseModel):
+    manager_notes: str = ""
+
+
+@router.put("/restock-requests/{request_id}/cancel")
+async def cancel_restock_manager(
+    request_id: str,
+    req: RestockCancelRequest,
+    manager: dict = Depends(require_manager),
+):
+    """Manager cancels a restock request in their department. Only allowed before delivery pickup."""
+    sb = get_supabase()
+    dept_id = manager.get("department_id")
+
+    restock = sb.table("restock_requests").select("*").eq("id", request_id).eq(
+        "department_id", dept_id
+    ).in_("status", ["pending_manager", "approved_manager"]).execute()
+
+    if not restock.data:
+        raise HTTPException(
+            status_code=404,
+            detail="Restock request not found, not in your department, or already picked up by delivery"
+        )
+
+    sb.table("restock_requests").update({
+        "status": "cancelled",
+        "manager_notes": req.manager_notes or restock.data[0].get("manager_notes", ""),
+    }).eq("id", request_id).execute()
+
+    return {"message": "Restock request cancelled"}
+
+
 class ChangePasswordRequest(BaseModel):
     new_password: str
 
@@ -641,7 +673,7 @@ async def list_department_products(
         raise HTTPException(status_code=400, detail="Manager is not assigned to a department")
 
     # Get all staff in department + the manager themselves (managers create products)
-    staff_result = sb.table("users").select("id, full_name").eq("department_id", dept_id).eq("role", "seller").execute()
+    staff_result = sb.table("users").select("id, full_name").eq("department_id", dept_id).eq("role", "staff").execute()
     staff_ids = [s["id"] for s in (staff_result.data or [])]
     staff_names = {s["id"]: s["full_name"] for s in (staff_result.data or [])}
 
@@ -689,7 +721,7 @@ async def update_department_product(product_id: str, req: dict, manager: dict = 
     dept_id = manager.get("department_id")
 
     # Get all seller IDs in this department + manager themselves
-    staff_result = sb.table("users").select("id").eq("department_id", dept_id).eq("role", "seller").execute()
+    staff_result = sb.table("users").select("id").eq("department_id", dept_id).eq("role", "staff").execute()
     allowed_ids = [s["id"] for s in (staff_result.data or [])]
     allowed_ids.append(manager["sub"])
 
@@ -722,7 +754,7 @@ async def list_department_transactions(
         raise HTTPException(status_code=400, detail="Manager is not assigned to a department")
 
     # Get all staff in department + manager themselves
-    staff_result = sb.table("users").select("id, full_name").eq("department_id", dept_id).eq("role", "seller").execute()
+    staff_result = sb.table("users").select("id, full_name").eq("department_id", dept_id).eq("role", "staff").execute()
     staff_ids = [s["id"] for s in (staff_result.data or [])]
 
     # Include manager's own ID (managers can create products with their own seller_id)
@@ -737,9 +769,10 @@ async def list_department_transactions(
         "*, products(title)"
     ).in_("seller_id", staff_ids).order("created_at", desc=True).limit(100).execute()
 
-    # Get buyer names
+    # Collect all user IDs needed: buyers, sellers, and assigned staff
     buyer_ids = set(t.get("buyer_id") for t in (txns.data or []) if t.get("buyer_id"))
-    all_user_ids = buyer_ids | set(staff_ids)
+    assigned_staff_ids = set(t.get("assigned_staff_id") for t in (txns.data or []) if t.get("assigned_staff_id"))
+    all_user_ids = buyer_ids | set(staff_ids) | assigned_staff_ids
     user_names = {}
     if all_user_ids:
         users_result = sb.table("users").select("id, full_name").in_("id", list(all_user_ids)).execute()
@@ -750,10 +783,12 @@ async def list_department_transactions(
         product_title = (t.get("products") or {}).get("title", "Unknown")
         if search and search.lower() not in product_title.lower() and search.lower() not in user_names.get(t.get("buyer_id"), "").lower():
             continue
+        assigned_staff_id = t.get("assigned_staff_id")
         results.append({
             "id": t["id"],
             "buyer_name": user_names.get(t.get("buyer_id"), "Unknown"),
             "seller_name": user_names.get(t.get("seller_id"), "Unknown"),
+            "assigned_staff_name": user_names.get(assigned_staff_id) if assigned_staff_id else None,
             "product_title": product_title,
             "quantity": int(t.get("quantity", 1)),
             "amount": float(t.get("amount", 0)),
@@ -794,8 +829,8 @@ async def remove_staff(user_id: str, manager: dict = Depends(require_manager)):
     if user.get("department_id") != dept_id:
         raise HTTPException(status_code=403, detail="This user is not in your department")
 
-    if user.get("role") != "seller":
-        raise HTTPException(status_code=400, detail="Can only remove staff (seller) members")
+    if user.get("role") != "staff":
+        raise HTTPException(status_code=400, detail="Can only remove staff members")
 
     # Delete only non-financial personal data.
     # Financial records are preserved — their user FKs are set to NULL
@@ -825,7 +860,7 @@ async def request_product_removal(product_id: str, manager: dict = Depends(requi
         raise HTTPException(status_code=400, detail="Manager is not assigned to a department")
 
     # Get all staff IDs in this department + manager
-    staff_result = sb.table("users").select("id").eq("department_id", dept_id).eq("role", "seller").execute()
+    staff_result = sb.table("users").select("id").eq("department_id", dept_id).eq("role", "staff").execute()
     staff_ids = [s["id"] for s in (staff_result.data or [])]
     if manager_id not in staff_ids:
         staff_ids.append(manager_id)

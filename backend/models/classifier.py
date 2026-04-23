@@ -61,6 +61,11 @@ LABEL_PRIORITY = {
 class ClassifierService:
     """Singleton service that classifies query-product pairs."""
 
+    # Softmax temperature: values > 1 soften the distribution to counteract
+    # the model's strong bias toward the Exact class from training.
+    # Combined with pure argmax, this lets S/C/I surface when appropriate.
+    SOFTMAX_TEMPERATURE = 2.0
+
     def __init__(self):
         self.model = None
         self.device = None
@@ -90,6 +95,16 @@ class ClassifierService:
         self._loaded = True
         print(f"[ClassifierService] Classifier loaded on {self.device}")
 
+    def _classify_from_probs(self, probs: np.ndarray) -> int:
+        """
+        Determine class ID using argmax — the class with the highest
+        predicted probability wins.
+
+        probs: shape (4,) — [exact, substitute, complement, irrelevant]
+        Returns: class_id (int)
+        """
+        return int(np.argmax(probs))
+
     def classify(self, query_embedding: np.ndarray, product_embedding: np.ndarray) -> dict:
         """
         Classify a single (query, product) pair.
@@ -103,9 +118,12 @@ class ClassifierService:
 
         with torch.no_grad():
             logits = self.model(q, p)
-            probabilities = torch.softmax(logits, dim=1)
-            class_id = torch.argmax(probabilities, dim=1).item()
-            confidence = probabilities[0][class_id].item()
+            # Temperature scaling to spread probability mass
+            probabilities = torch.softmax(logits / self.SOFTMAX_TEMPERATURE, dim=1)
+
+        probs = probabilities[0].cpu().numpy()
+        class_id = self._classify_from_probs(probs)
+        confidence = float(probs[class_id])
 
         return {
             "label": CLASS_ID_TO_LABEL[class_id],
@@ -130,22 +148,25 @@ class ClassifierService:
 
         with torch.no_grad():
             logits = self.model(q, p)
-            probabilities = torch.softmax(logits, dim=1)
-            class_ids = torch.argmax(probabilities, dim=1).cpu().numpy()
-            confidences = probabilities.max(dim=1).values.cpu().numpy()
+            # Temperature scaling to spread probability mass
+            probabilities = torch.softmax(logits / self.SOFTMAX_TEMPERATURE, dim=1)
 
         all_probs = probabilities.cpu().numpy()
 
         results = []
         for i in range(n):
+            probs = all_probs[i]
+            class_id = self._classify_from_probs(probs)
+            confidence = float(probs[class_id])
+
             results.append({
-                "label": CLASS_ID_TO_LABEL[int(class_ids[i])],
-                "confidence": round(float(confidences[i]), 4),
-                "class_id": int(class_ids[i]),
-                "exact_prob": round(float(all_probs[i][0]), 4),
-                "substitute_prob": round(float(all_probs[i][1]), 4),
-                "complement_prob": round(float(all_probs[i][2]), 4),
-                "irrelevant_prob": round(float(all_probs[i][3]), 4),
+                "label": CLASS_ID_TO_LABEL[class_id],
+                "confidence": round(confidence, 4),
+                "class_id": class_id,
+                "exact_prob": round(float(probs[0]), 4),
+                "substitute_prob": round(float(probs[1]), 4),
+                "complement_prob": round(float(probs[2]), 4),
+                "irrelevant_prob": round(float(probs[3]), 4),
             })
         return results
 
