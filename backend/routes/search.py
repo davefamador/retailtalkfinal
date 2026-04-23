@@ -158,6 +158,7 @@ def _run_search_pipeline(
     include_complements: bool,
     include_substitutes: bool,
     show_all: bool,
+    is_multi_group: bool = False,
 ) -> list[SearchResultItem]:
     """
     Core search pipeline for a single search group.
@@ -209,12 +210,14 @@ def _run_search_pipeline(
             "exact_prob": 1.0, "substitute_prob": 0.0, "complement_prob": 0.0, "irrelevant_prob": 0.0}
             for _ in candidates]
 
-    if ranker_service._loaded:
-        w_r, w_c, w_s = 0.55, 0.05, 0.40
+    # Multi-group queries use short vague terms — CrossEncoder is unreliable on them.
+    # Shift weight toward similarity and lower the threshold so results aren't wiped out.
+    if is_multi_group:
+        w_r, w_c, w_s = (0.30, 0.05, 0.65) if ranker_service._loaded else (0.0, 0.05, 0.95)
+        MIN_RELEVANCE_SCORE = 0.45
     else:
-        w_r, w_c, w_s = 0.0, 0.05, 0.95
-
-    MIN_RELEVANCE_SCORE = 0.70
+        w_r, w_c, w_s = (0.55, 0.05, 0.40) if ranker_service._loaded else (0.0, 0.05, 0.95)
+        MIN_RELEVANCE_SCORE = 0.70
     scored = []
     for idx, (cand, cls) in enumerate(zip(candidates, classifications)):
         label = cls["label"]
@@ -278,17 +281,23 @@ async def search_products(
             return await _fallback_text_search(q, rewritten, max_results)
 
         # Run pipeline for each search group
+        num_groups = len(rewritten.search_groups)
+        is_multi = num_groups > 1
+        per_group_limit = max(3, max_results // num_groups) if is_multi else max_results
+        per_group_candidates = 80 if is_multi else SEARCH_TOP_K_CANDIDATES
+
         all_results = []
         for group in rewritten.search_groups:
             group_results = _run_search_pipeline(
                 search_text=group.search_text,
                 filters=group.filters,
-                max_candidates=SEARCH_TOP_K_CANDIDATES,
+                max_candidates=per_group_candidates,
                 include_complements=include_complements,
                 include_substitutes=include_substitutes,
                 show_all=show_all,
+                is_multi_group=is_multi,
             )
-            all_results.extend(group_results)
+            all_results.extend(group_results[:per_group_limit])
 
         # Deduplicate by product id (keep highest relevance score)
         seen = {}
