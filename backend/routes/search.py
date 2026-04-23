@@ -154,7 +154,6 @@ def _label_to_priority_weight(label: str) -> float:
 def _run_search_pipeline(
     search_text: str,
     filters: dict,
-    original_query: str,
     max_candidates: int,
     include_complements: bool,
     include_substitutes: bool,
@@ -197,7 +196,7 @@ def _run_search_pipeline(
 
     product_titles = [c["title"] for c in candidates]
     if ranker_service._loaded:
-        raw_ranker_scores = ranker_service.rank(original_query, product_titles)
+        raw_ranker_scores = ranker_service.rank(search_text, product_titles)
         ranker_scores = ranker_service.normalize_scores(raw_ranker_scores)
     else:
         ranker_scores = [c["similarity"] for c in candidates]
@@ -284,7 +283,6 @@ async def search_products(
             group_results = _run_search_pipeline(
                 search_text=group.search_text,
                 filters=group.filters,
-                original_query=q,
                 max_candidates=SEARCH_TOP_K_CANDIDATES,
                 include_complements=include_complements,
                 include_substitutes=include_substitutes,
