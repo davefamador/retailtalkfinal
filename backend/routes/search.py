@@ -159,12 +159,20 @@ def _run_search_pipeline(
     include_substitutes: bool,
     show_all: bool,
     is_multi_group: bool = False,
+    esci_query_embedding: np.ndarray = None,
 ) -> list[SearchResultItem]:
     """
     Core search pipeline for a single search group.
     Stages: BERT Embedding -> pgvector -> CrossEncoder -> ESCI -> Score Blending
+
+    `esci_query_embedding` is the embedding used for ESCI classification.
+    When running multi-group, pass the ORIGINAL full-query embedding so the
+    classifier sees the kind of input it was trained on (conversational queries),
+    not the short group fragment.
     """
     query_embedding = bert_service.compute_embedding(search_text)
+    if esci_query_embedding is None:
+        esci_query_embedding = query_embedding
 
     # Log brand detection — brand is embedded in search_text by query rewriter;
     # no ILIKE hard filter is used (would over-aggressively exclude results).
@@ -204,27 +212,42 @@ def _run_search_pipeline(
 
     product_embeddings = np.array([c["embedding"] for c in candidates])
     if classifier_service._loaded:
-        classifications = classifier_service.classify_batch(query_embedding, product_embeddings)
+        # Use the full original-query embedding (or the single-group embedding)
+        # so the ESCI classifier receives input closer to its training distribution.
+        classifications = classifier_service.classify_batch(esci_query_embedding, product_embeddings)
     else:
         classifications = [{"label": "Exact", "confidence": 1.0, "class_id": 0,
                             "exact_prob": 1.0, "substitute_prob": 0.0,
                             "complement_prob": 0.0, "irrelevant_prob": 0.0}
                            for _ in candidates]
 
-    # Multi-group: short vague group terms make the ESCI label unreliable for filtering.
-    # Zero out classifier weight so it doesn't affect scoring, and don't gate on the label.
-    # Single query: full weights, label-based filtering applies normally.
+    # Multi-group uses a lower threshold and stronger similarity weight
+    # because short group terms don't give the ranker much to grip on.
     if is_multi_group:
-        w_r, w_c, w_s = (0.35, 0.0, 0.65) if ranker_service._loaded else (0.0, 0.0, 1.0)
+        w_r, w_c, w_s = (0.35, 0.05, 0.60) if ranker_service._loaded else (0.0, 0.05, 0.95)
         MIN_RELEVANCE_SCORE = 0.45
     else:
         w_r, w_c, w_s = (0.55, 0.05, 0.40) if ranker_service._loaded else (0.0, 0.05, 0.95)
         MIN_RELEVANCE_SCORE = 0.70
+
+    # Evidence-based relabel: if the ranker + similarity both strongly agree the product
+    # matches this group, override a spurious Irrelevant/Complement → Substitute.
+    # This catches the failure mode where ESCI flips to Irrelevant on a match it can't
+    # verify (short group terms, out-of-distribution phrasings).
+    STRONG_MATCH_RANKER = 0.75
+    STRONG_MATCH_SIM = 0.55
+
     scored = []
     for idx, (cand, cls) in enumerate(zip(candidates, classifications)):
         label = cls["label"]
         r_score = float(ranker_scores[idx])
         sim = float(cand["similarity"])
+
+        # Evidence override: demote Irrelevant → Substitute when retrieval signals agree
+        if label == "Irrelevant" and r_score >= STRONG_MATCH_RANKER and sim >= STRONG_MATCH_SIM:
+            label = "Substitute"
+            cls = {**cls, "label": "Substitute"}
+
         rel = _compute_blended_score(r_score, _label_to_priority_weight(label), sim, w_r, w_c, w_s)
         if not show_all and rel < MIN_RELEVANCE_SCORE:
             continue
@@ -288,6 +311,11 @@ async def search_products(
         per_group_limit = max(3, max_results // num_groups) if is_multi else max_results
         per_group_candidates = 80 if is_multi else SEARCH_TOP_K_CANDIDATES
 
+        # For ESCI classification, use the embedding of the full original query.
+        # The classifier was trained on conversational queries; giving it the short
+        # per-group term (e.g. "toys") produces unreliable Irrelevant labels.
+        esci_query_embedding = bert_service.compute_embedding(q) if is_multi else None
+
         all_results = []
         for group in rewritten.search_groups:
             group_results = _run_search_pipeline(
@@ -298,6 +326,7 @@ async def search_products(
                 include_substitutes=include_substitutes,
                 show_all=show_all,
                 is_multi_group=is_multi,
+                esci_query_embedding=esci_query_embedding,
             )
             all_results.extend(group_results[:per_group_limit])
 
