@@ -6,7 +6,7 @@ Only accessible by admin users (role='admin').
 from fastapi import APIRouter, HTTPException, Depends, Query
 from pydantic import BaseModel
 from typing import Optional
-from database import get_supabase
+from database import get_supabase, sb_execute
 from routes.auth import get_current_user
 from datetime import datetime, timedelta, timezone
 
@@ -1288,9 +1288,11 @@ async def list_departments(admin: dict = Depends(require_admin)):
         total_orders = 0
         delivery_orders = 0
         if staff_ids:
-            txns = sb.table("product_transactions").select(
-                "seller_amount"
-            ).in_("seller_id", staff_ids).in_("status", ["delivered", "completed"]).execute()
+            txns = sb_execute(
+                sb.table("product_transactions").select(
+                    "seller_amount"
+                ).in_("seller_id", staff_ids).in_("status", ["delivered", "completed"])
+            )
             for t in (txns.data or []):
                 total_revenue += float(t.get("seller_amount", 0))
                 total_orders += 1
