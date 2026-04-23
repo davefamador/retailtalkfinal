@@ -5,8 +5,23 @@ and supabase-py for standard CRUD operations.
 """
 
 import os
+import time
 import numpy as np
 from supabase import create_client, Client
+
+
+def sb_execute(query, retries: int = 2, backoff: float = 1.0):
+    """Run a postgrest query, retrying up to `retries` times on transient 502/503 errors."""
+    for attempt in range(retries + 1):
+        try:
+            return query.execute()
+        except Exception as e:
+            msg = str(e)
+            is_transient = '502' in msg or '503' in msg
+            if is_transient and attempt < retries:
+                time.sleep(backoff * (attempt + 1))
+                continue
+            raise
 
 # --- Supabase Client (for CRUD operations) ---
 
