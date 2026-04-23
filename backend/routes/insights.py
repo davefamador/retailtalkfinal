@@ -119,7 +119,7 @@ async def get_buyer_recommendations(current_user: dict = Depends(get_current_use
         # Fallback: return popular/recent products for new users
         fallback_resp = (
             sb.table("products")
-            .select("*, users!products_seller_id_fkey(full_name)")
+            .select("id, seller_id, title, description, price, stock, images, is_active, status, created_at, users!products_seller_id_fkey(full_name)")
             .eq("is_active", True)
             .gt("stock", 0)
             .order("created_at", desc=True)

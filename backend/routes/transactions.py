@@ -9,13 +9,24 @@ from fastapi import APIRouter, HTTPException, Depends
 from pydantic import BaseModel
 from typing import Optional
 import uuid
+from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime, timezone, timedelta
 from database import get_supabase
 from routes.auth import get_current_user
 
 router = APIRouter(prefix="/transactions", tags=["Transactions"])
 
-DELIVERY_FEE = 90.00
+DELIVERY_FEE = 40.00
+
+_TXN_POOL = ThreadPoolExecutor(max_workers=8, thread_name_prefix="txn-sb")
+
+# Fields needed by TransactionResponse / response builders. Avoids select("*")
+# on product_transactions which can include large/unused columns.
+_TXN_COLS = (
+    "id, buyer_id, seller_id, product_id, assigned_staff_id, delivery_user_id, "
+    "quantity, amount, seller_amount, admin_commission, delivery_fee, status, "
+    "purchase_type, delivery_address, group_id, created_at, picked_up_at"
+)
 
 
 # --- Request/Response Models ---
@@ -269,27 +280,37 @@ async def get_transaction_history(current_user: dict = Depends(get_current_user)
     sb = get_supabase()
     user_id = current_user["sub"]
 
-    bought = sb.table("product_transactions").select("*, products(title, images)").eq("buyer_id", user_id).order("created_at", desc=True).execute()
-    sold = sb.table("product_transactions").select("*, products(title, images)").eq("seller_id", user_id).order("created_at", desc=True).execute()
+    def run(q):
+        return q.execute()
 
+    # Fire the 3 independent fetches in parallel. History is a hot path
+    # (both /orders and the buyer dashboard call it).
+    sel = _TXN_COLS + ", products(title, images)"
+    f_bought = _TXN_POOL.submit(run, sb.table("product_transactions").select(sel).eq("buyer_id", user_id).order("created_at", desc=True).limit(500))
+    f_sold = _TXN_POOL.submit(run, sb.table("product_transactions").select(sel).eq("seller_id", user_id).order("created_at", desc=True).limit(500))
+    f_user = _TXN_POOL.submit(run, sb.table("users").select("role, department_id").eq("id", user_id))
+
+    bought = f_bought.result()
+    sold = f_sold.result()
+    user_info = f_user.result()
     all_txns = (bought.data or []) + (sold.data or [])
 
     # For sellers/managers in a department, also include department-wide transactions
-    user_info = sb.table("users").select("role, department_id").eq("id", user_id).execute()
     if user_info.data and user_info.data[0].get("role") in ("staff", "manager") and user_info.data[0].get("department_id"):
         dept_id = user_info.data[0]["department_id"]
-        dept_staff = sb.table("users").select("id").eq("department_id", dept_id).execute()
+        f_staff = _TXN_POOL.submit(run, sb.table("users").select("id").eq("department_id", dept_id))
+        f_dept = _TXN_POOL.submit(run, sb.table("departments").select("manager_id").eq("id", dept_id))
+        dept_staff = f_staff.result()
+        dept_info = f_dept.result()
         dept_ids = [s["id"] for s in (dept_staff.data or [])]
-        # Also include the department manager
-        dept_info = sb.table("departments").select("manager_id").eq("id", dept_id).execute()
         if dept_info.data and dept_info.data[0].get("manager_id"):
             mgr_id = dept_info.data[0]["manager_id"]
             if mgr_id not in dept_ids:
                 dept_ids.append(mgr_id)
         if dept_ids:
-            dept_txns = sb.table("product_transactions").select("*, products(title, images)").in_(
+            dept_txns = sb.table("product_transactions").select(sel).in_(
                 "seller_id", dept_ids
-            ).order("created_at", desc=True).execute()
+            ).order("created_at", desc=True).limit(500).execute()
             all_txns += (dept_txns.data or [])
     seen = set()
     unique_txns = []
@@ -300,47 +321,41 @@ async def get_transaction_history(current_user: dict = Depends(get_current_user)
 
     unique_txns.sort(key=lambda t: t["created_at"], reverse=True)
 
-    # Get delivery user info
-    delivery_ids = set(t.get("delivery_user_id") for t in unique_txns if t.get("delivery_user_id"))
-    delivery_names = {}
-    delivery_contacts = {}
-    if delivery_ids:
-        d_users = sb.table("users").select("id, full_name").in_("id", list(delivery_ids)).execute()
-        delivery_names = {u["id"]: u["full_name"] for u in (d_users.data or [])}
-        d_contacts = sb.table("user_contacts").select("user_id, contact_number").in_("user_id", list(delivery_ids)).execute()
-        delivery_contacts = {c["user_id"]: c["contact_number"] for c in (d_contacts.data or [])}
-
-    # Get seller names (use department name if seller belongs to a department)
-    seller_ids = set(t.get("seller_id") for t in unique_txns if t.get("seller_id"))
-    seller_names = {}
-    if seller_ids:
-        s_users = sb.table("users").select("id, full_name, department_id").in_("id", list(seller_ids)).execute()
-        # Batch-lookup department names
-        dept_ids = set(u.get("department_id") for u in (s_users.data or []) if u.get("department_id"))
-        dept_names = {}
-        if dept_ids:
-            depts = sb.table("departments").select("id, name").in_("id", list(dept_ids)).execute()
-            dept_names = {d["id"]: d["name"] for d in (depts.data or [])}
-        for u in (s_users.data or []):
-            dept_id = u.get("department_id")
-            if dept_id and dept_id in dept_names:
-                seller_names[u["id"]] = dept_names[dept_id]
-            else:
-                seller_names[u["id"]] = u["full_name"]
-
-    # Get buyer names
+    # Collect every user_id we need in one set, then do ONE users fetch + one
+    # contacts fetch in parallel. Old impl fired 4-6 sequential round-trips.
     buyer_ids = set(t.get("buyer_id") for t in unique_txns if t.get("buyer_id"))
-    buyer_names = {}
-    if buyer_ids:
-        b_users = sb.table("users").select("id, full_name").in_("id", list(buyer_ids)).execute()
-        buyer_names = {u["id"]: u["full_name"] for u in (b_users.data or [])}
-
-    # Get assigned staff names
+    seller_ids = set(t.get("seller_id") for t in unique_txns if t.get("seller_id"))
+    delivery_ids = set(t.get("delivery_user_id") for t in unique_txns if t.get("delivery_user_id"))
     assigned_ids = set(t.get("assigned_staff_id") for t in unique_txns if t.get("assigned_staff_id"))
-    assigned_names = {}
-    if assigned_ids:
-        a_users = sb.table("users").select("id, full_name").in_("id", list(assigned_ids)).execute()
-        assigned_names = {u["id"]: u["full_name"] for u in (a_users.data or [])}
+    all_user_ids = list(buyer_ids | seller_ids | delivery_ids | assigned_ids)
+
+    def _run(q):
+        return q.execute()
+
+    f_users = _TXN_POOL.submit(_run, sb.table("users").select("id, full_name, department_id").in_("id", all_user_ids)) if all_user_ids else None
+    f_contacts = _TXN_POOL.submit(_run, sb.table("user_contacts").select("user_id, contact_number").in_("user_id", list(delivery_ids))) if delivery_ids else None
+
+    user_rows = (f_users.result().data or []) if f_users else []
+    user_by_id = {u["id"]: u for u in user_rows}
+
+    dept_id_set = list({u.get("department_id") for u in user_rows if u.get("department_id")})
+    dept_names = {}
+    if dept_id_set:
+        depts_resp = sb.table("departments").select("id, name").in_("id", dept_id_set).execute()
+        dept_names = {d["id"]: d["name"] for d in (depts_resp.data or [])}
+
+    seller_names = {}
+    for sid in seller_ids:
+        u = user_by_id.get(sid, {})
+        seller_names[sid] = dept_names.get(u.get("department_id")) or u.get("full_name", "")
+
+    buyer_names = {bid: user_by_id.get(bid, {}).get("full_name", "") for bid in buyer_ids}
+    delivery_names = {did: user_by_id.get(did, {}).get("full_name", "") for did in delivery_ids}
+    assigned_names = {aid: user_by_id.get(aid, {}).get("full_name", "") for aid in assigned_ids}
+
+    delivery_contacts = {}
+    if f_contacts:
+        delivery_contacts = {c["user_id"]: c["contact_number"] for c in (f_contacts.result().data or [])}
 
     return [
         TransactionResponse(
@@ -494,7 +509,7 @@ async def get_staff_delivery_orders(current_user: dict = Depends(get_current_use
         seller_ids = [user_id]
 
     txns = sb.table("product_transactions").select(
-        "*, products(title, price, images)"
+        _TXN_COLS + ", products(title, price, images)"
     ).in_("seller_id", seller_ids).in_(
         "status", ["pending", "approved", "ondeliver"]
     ).order("created_at", desc=False).execute()
@@ -642,7 +657,7 @@ async def get_manager_delivery_orders(current_user: dict = Depends(get_current_u
         return []
 
     txns = sb.table("product_transactions").select(
-        "*, products(title, price, images)"
+        _TXN_COLS + ", products(title, price, images)"
     ).in_("seller_id", seller_ids).in_(
         "status", ["pending", "approved", "ondeliver"]
     ).order("created_at", desc=False).execute()

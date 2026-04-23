@@ -16,6 +16,13 @@ from routes.auth import get_current_user
 
 router = APIRouter(prefix="/products", tags=["Products"])
 
+# Explicit column list — NEVER use select("*") on products: the `embedding` column
+# is a 768-dim pgvector (~3KB per row) and is only needed by the search pipeline.
+_PRODUCT_COLS = (
+    "id, seller_id, title, description, price, stock, images, "
+    "tracking_number, is_active, status, created_at"
+)
+
 
 # --- Request/Response Models ---
 
@@ -213,7 +220,7 @@ async def list_products(limit: int = 50, offset: int = 0):
     sb = get_supabase()
     result = (
         sb.table("products")
-        .select("*, users!products_seller_id_fkey(full_name, department_id)")
+        .select(_PRODUCT_COLS + ", users!products_seller_id_fkey(full_name, department_id)")
         .eq("is_active", True)
         .eq("status", "approved")
         .gt("stock", 0)
@@ -266,7 +273,7 @@ async def list_my_products(current_user: dict = Depends(get_current_user)):
             if manager_id not in seller_ids:
                 seller_ids.append(manager_id)
 
-    result = sb.table("products").select("*").in_("seller_id", seller_ids).order("created_at", desc=True).execute()
+    result = sb.table("products").select(_PRODUCT_COLS).in_("seller_id", seller_ids).order("created_at", desc=True).execute()
 
     return [build_product_response(p) for p in result.data]
 
@@ -275,7 +282,7 @@ async def list_my_products(current_user: dict = Depends(get_current_user)):
 async def get_product(product_id: str):
     """Get a single product by ID (public)."""
     sb = get_supabase()
-    result = sb.table("products").select("*, users!products_seller_id_fkey(full_name, department_id)").eq("id", product_id).execute()
+    result = sb.table("products").select(_PRODUCT_COLS + ", users!products_seller_id_fkey(full_name, department_id)").eq("id", product_id).execute()
 
     if not result.data:
         raise HTTPException(status_code=404, detail="Product not found")

@@ -57,17 +57,26 @@ async def get_cart(current_user: dict = Depends(get_current_user)):
     user_id = current_user["sub"]
 
     cart_data = sb.table("cart_items").select(
-        "*, products(id, title, description, price, seller_id, images, stock)"
+        "id, quantity, products(id, title, description, price, seller_id, images, stock)"
     ).eq("buyer_id", user_id).order("created_at", desc=False).execute()
+
+    rows = cart_data.data or []
+
+    # Resolve all seller names + departments in two queries instead of two per row.
+    seller_ids = list({c["products"]["seller_id"] for c in rows if c.get("products")})
+    sellers = sb.table("users").select("id, full_name, department_id").in_("id", seller_ids).execute() if seller_ids else None
+    seller_map = {s["id"]: s for s in (sellers.data or [])} if sellers else {}
+
+    dept_id_list = list({s.get("department_id") for s in seller_map.values() if s.get("department_id")})
+    depts = sb.table("departments").select("id, name").in_("id", dept_id_list).execute() if dept_id_list else None
+    dept_name_map = {d["id"]: d["name"] for d in (depts.data or [])} if depts else {}
 
     items = []
     department_ids = set()
     independent_sellers = set()
     products_total = 0.0
-    seller_name_cache = {}
-    seller_dept_cache = {}
 
-    for c in (cart_data.data or []):
+    for c in rows:
         prod = c.get("products")
         if not prod:
             continue
@@ -77,29 +86,11 @@ async def get_cart(current_user: dict = Depends(get_current_user)):
         subtotal = price * qty
         products_total += subtotal
 
-        # Look up seller name and department (cached)
         sid = prod["seller_id"]
-        if sid not in seller_name_cache:
-            seller_resp = sb.table("users").select("full_name, department_id").eq("id", sid).execute()
-            if seller_resp.data:
-                full_name = seller_resp.data[0]["full_name"]
-                dept_id_val = seller_resp.data[0].get("department_id")
-                seller_dept_cache[sid] = dept_id_val
-                if dept_id_val:
-                    dept_resp = sb.table("departments").select("name").eq("id", dept_id_val).execute()
-                    if dept_resp.data:
-                        seller_name_cache[sid] = dept_resp.data[0]["name"]
-                    else:
-                        seller_name_cache[sid] = full_name
-                else:
-                    seller_name_cache[sid] = full_name
-            else:
-                seller_name_cache[sid] = "Seller"
-                seller_dept_cache[sid] = None
-        seller_name = seller_name_cache[sid]
+        seller = seller_map.get(sid, {})
+        dept_id = seller.get("department_id")
+        seller_name = dept_name_map.get(dept_id) or seller.get("full_name") or "Seller"
 
-        # Track unique departments (independent sellers each count as one unit)
-        dept_id = seller_dept_cache.get(sid)
         if dept_id:
             department_ids.add(dept_id)
         else:
@@ -115,7 +106,7 @@ async def get_cart(current_user: dict = Depends(get_current_user)):
             price=price,
             quantity=qty,
             subtotal=round(subtotal, 2),
-            seller_id=prod["seller_id"],
+            seller_id=sid,
             seller_name=seller_name,
             image_url=images[0] if images else "",
         ))
