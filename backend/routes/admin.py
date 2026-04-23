@@ -6,11 +6,20 @@ Only accessible by admin users (role='admin').
 from fastapi import APIRouter, HTTPException, Depends, Query
 from pydantic import BaseModel
 from typing import Optional
-from database import get_supabase, sb_execute
+from concurrent.futures import ThreadPoolExecutor
+from database import get_supabase
 from routes.auth import get_current_user
 from datetime import datetime, timedelta, timezone
 
 router = APIRouter(prefix="/admin", tags=["Admin"])
+
+# Supabase-py calls are blocking HTTP; run in parallel via a shared pool.
+_ADMIN_POOL = ThreadPoolExecutor(max_workers=12, thread_name_prefix="admin-sb")
+
+# Columns of `products` that are cheap to ship. Never use select("*") on products:
+# the `embedding` column is a 768-dim vector (~3KB/row) and is never needed here.
+_PRODUCT_COLS = "id, seller_id, title, description, price, stock, images, is_active, status, created_at"
+_PRODUCT_COLS_WITH_REMOVAL = _PRODUCT_COLS + ", removal_requested_by, removal_requested_at"
 
 
 # --- Helpers ---
@@ -167,37 +176,42 @@ async def admin_dashboard(admin: dict = Depends(require_admin)):
     """Get admin dashboard stats."""
     sb = get_supabase()
 
-    users = sb.table("users").select("id", count="exact").execute()
-    products = sb.table("products").select("id", count="exact").eq("is_active", True).execute()
-    txns = sb.table("product_transactions").select("amount").in_("status", ["completed", "delivered"]).execute()
-    all_txns = sb.table("product_transactions").select("id", count="exact").execute()
+    # Fire all 10 independent queries in parallel instead of sequentially.
+    # Each one is a blocking HTTP round-trip to Supabase; sequential adds up fast.
+    def run(query):
+        return query.execute()
 
-    total_volume = sum(float(t.get("amount", 0)) for t in txns.data) if txns.data else 0
+    queries = {
+        "users": sb.table("users").select("id", count="exact"),
+        "products": sb.table("products").select("id", count="exact").eq("is_active", True),
+        "txns_completed": sb.table("product_transactions").select("amount").in_("status", ["completed", "delivered"]),
+        "all_txns": sb.table("product_transactions").select("id", count="exact"),
+        "earnings": sb.table("admin_earnings").select("amount"),
+        "buyers": sb.table("users").select("id", count="exact").eq("role", "buyer"),
+        "managers": sb.table("users").select("id", count="exact").eq("role", "manager"),
+        "staff": sb.table("users").select("id", count="exact").eq("role", "staff"),
+        "delivery": sb.table("users").select("id", count="exact").eq("role", "delivery"),
+        "departments": sb.table("departments").select("id", count="exact"),
+    }
+    futures = {k: _ADMIN_POOL.submit(run, q) for k, q in queries.items()}
+    r = {k: f.result() for k, f in futures.items()}
 
-    # Admin earnings = total credited to admin from successful transactions
-    earnings = sb.table("admin_earnings").select("amount").execute()
-    total_admin_earnings = sum(float(e["amount"]) for e in (earnings.data or []))
-
-    # Role counts
-    buyers_count = sb.table("users").select("id", count="exact").eq("role", "buyer").execute()
-    managers_count = sb.table("users").select("id", count="exact").eq("role", "manager").execute()
-    staff_count = sb.table("users").select("id", count="exact").eq("role", "staff").execute()
-    delivery_count = sb.table("users").select("id", count="exact").eq("role", "delivery").execute()
-    departments_count = sb.table("departments").select("id", count="exact").execute()
+    total_volume = sum(float(t.get("amount", 0)) for t in (r["txns_completed"].data or []))
+    total_admin_earnings = sum(float(e["amount"]) for e in (r["earnings"].data or []))
 
     return DashboardResponse(
-        total_users=users.count or 0,
-        total_products=products.count or 0,
-        total_orders=len(txns.data) if txns.data else 0,
-        total_transaction_orders=all_txns.count or 0,
+        total_users=r["users"].count or 0,
+        total_products=r["products"].count or 0,
+        total_orders=len(r["txns_completed"].data or []),
+        total_transaction_orders=r["all_txns"].count or 0,
         total_revenue=round(total_volume, 2),
         total_sales_volume=round(total_volume, 2),
         total_admin_earnings=round(total_admin_earnings, 2),
-        total_buyers=buyers_count.count or 0,
-        total_departments=departments_count.count or 0,
-        total_managers=managers_count.count or 0,
-        total_staff=staff_count.count or 0,
-        total_delivery=delivery_count.count or 0,
+        total_buyers=r["buyers"].count or 0,
+        total_departments=r["departments"].count or 0,
+        total_managers=r["managers"].count or 0,
+        total_staff=r["staff"].count or 0,
+        total_delivery=r["delivery"].count or 0,
     )
 
 
@@ -416,9 +430,13 @@ async def list_transactions(
     """List all product transactions with search and filters support."""
     sb = get_supabase()
 
+    # Select only the columns the response actually uses. Cap at 1000 to avoid
+    # shipping the entire transaction history on every page load.
     q = sb.table("product_transactions").select(
-        "*, products(title, images)"
-    ).order("created_at", desc=True)
+        "id, buyer_id, seller_id, product_id, delivery_user_id, assigned_staff_id, "
+        "quantity, amount, seller_amount, admin_commission, delivery_fee, status, "
+        "purchase_type, created_at, products(title, images)"
+    ).order("created_at", desc=True).limit(1000)
 
     if txn_type:
         q = q.eq("purchase_type", txn_type)
@@ -774,10 +792,11 @@ async def list_admin_products(
     """List all products for admin management."""
     sb = get_supabase()
 
+    product_cols = _PRODUCT_COLS + ", users!products_seller_id_fkey(full_name, department_id)"
     if search:
-        products = sb.table("products").select("*, users!products_seller_id_fkey(full_name, department_id)").ilike("title", f"%{search}%").order("created_at", desc=True).limit(200).execute()
+        products = sb.table("products").select(product_cols).ilike("title", f"%{search}%").order("created_at", desc=True).limit(200).execute()
     else:
-        products = sb.table("products").select("*, users!products_seller_id_fkey(full_name, department_id)").order("created_at", desc=True).limit(200).execute()
+        products = sb.table("products").select(product_cols).order("created_at", desc=True).limit(200).execute()
 
     # Batch-lookup department names
     dept_ids = set()
@@ -840,7 +859,7 @@ async def admin_update_product(
         raise HTTPException(status_code=500, detail="Failed to update product")
 
     # Re-fetch with seller name
-    p_result = sb.table("products").select("*, users!products_seller_id_fkey(full_name, department_id)").eq("id", product_id).execute()
+    p_result = sb.table("products").select(_PRODUCT_COLS + ", users!products_seller_id_fkey(full_name, department_id)").eq("id", product_id).execute()
     p = p_result.data[0]
 
     user_info = p.get("users") or {}
@@ -1071,20 +1090,25 @@ async def get_user_detail(user_id: str, admin: dict = Depends(require_admin)):
 async def admin_get_pending_products(admin: dict = Depends(require_admin)):
     """Get all products with status 'pending', with seller info."""
     sb = get_supabase()
-    prods = sb.table("products").select("*").eq("status", "pending").order("created_at", desc=True).execute()
+    prods = sb.table("products").select(_PRODUCT_COLS).eq("status", "pending").order("created_at", desc=True).execute()
+
+    rows = prods.data or []
+    if not rows:
+        return []
+
+    seller_ids = list({p["seller_id"] for p in rows if p.get("seller_id")})
+    sellers = sb.table("users").select("id, full_name, email, department_id").in_("id", seller_ids).execute() if seller_ids else None
+    seller_map = {s["id"]: s for s in (sellers.data or [])} if sellers else {}
+
+    dept_ids = list({s.get("department_id") for s in seller_map.values() if s.get("department_id")})
+    depts = sb.table("departments").select("id, name").in_("id", dept_ids).execute() if dept_ids else None
+    dept_name_map = {d["id"]: d["name"] for d in (depts.data or [])} if depts else {}
 
     results = []
-    for p in (prods.data or []):
-        seller = sb.table("users").select("full_name, email, department_id").eq("id", p["seller_id"]).execute()
-        seller_info = seller.data[0] if seller.data else {}
-
-        seller_name = seller_info.get("full_name", "Unknown")
+    for p in rows:
+        seller_info = seller_map.get(p["seller_id"], {})
         dept_id = seller_info.get("department_id")
-        if dept_id:
-            dept_resp = sb.table("departments").select("name").eq("id", dept_id).execute()
-            if dept_resp.data:
-                seller_name = dept_resp.data[0]["name"]
-
+        seller_name = dept_name_map.get(dept_id) or seller_info.get("full_name", "Unknown")
         results.append({
             "id": p["id"],
             "title": p["title"],
@@ -1255,61 +1279,87 @@ async def list_departments(admin: dict = Depends(require_admin)):
     """List all departments with manager info and staff count."""
     sb = get_supabase()
 
-    depts = sb.table("departments").select("*").order("created_at", desc=True).execute()
+    # Fetch departments, their managers+staff, products, and all completed txns
+    # in parallel and aggregate in memory. Old impl did 4-5 queries per department.
+    def run(q):
+        return q.execute()
+
+    depts_q = sb.table("departments").select("*").order("created_at", desc=True)
+    users_q = sb.table("users").select("id, full_name, role, department_id").in_("role", ["manager", "staff"])
+    products_q = sb.table("products").select("seller_id, stock").eq("is_active", True)
+    txns_q = sb.table("product_transactions").select("seller_id, seller_amount").in_("status", ["delivered", "completed"])
+
+    f_depts = _ADMIN_POOL.submit(run, depts_q)
+    f_users = _ADMIN_POOL.submit(run, users_q)
+    f_products = _ADMIN_POOL.submit(run, products_q)
+    f_txns = _ADMIN_POOL.submit(run, txns_q)
+
+    depts = f_depts.result().data or []
+    users = f_users.result().data or []
+    products = f_products.result().data or []
+    txns = f_txns.result().data or []
+
+    # Index users by id (for manager name) and by department (staff list + manager via role)
+    user_by_id = {u["id"]: u for u in users}
+    dept_members = {}  # dept_id -> [user_ids including manager]
+    staff_count_by_dept = {}
+    for u in users:
+        did = u.get("department_id")
+        if not did:
+            continue
+        dept_members.setdefault(did, []).append(u["id"])
+        if u.get("role") == "staff":
+            staff_count_by_dept[did] = staff_count_by_dept.get(did, 0) + 1
+
+    # Map each seller_id -> their dept so we can aggregate products/txns per dept in O(N)
+    seller_to_dept = {u["id"]: u.get("department_id") for u in users if u.get("department_id")}
+    # Also include manager_id from departments (in case their department_id isn't set)
+    for d in depts:
+        mid = d.get("manager_id")
+        if mid and mid not in seller_to_dept:
+            seller_to_dept[mid] = d["id"]
+            dept_members.setdefault(d["id"], []).append(mid)
+
+    product_count_by_dept = {}
+    low_stock_by_dept = {}
+    for p in products:
+        did = seller_to_dept.get(p["seller_id"])
+        if not did:
+            continue
+        product_count_by_dept[did] = product_count_by_dept.get(did, 0) + 1
+        if int(p.get("stock", 0) or 0) < 5:
+            low_stock_by_dept[did] = low_stock_by_dept.get(did, 0) + 1
+
+    revenue_by_dept = {}
+    orders_by_dept = {}
+    for t in txns:
+        did = seller_to_dept.get(t["seller_id"])
+        if not did:
+            continue
+        revenue_by_dept[did] = revenue_by_dept.get(did, 0.0) + float(t.get("seller_amount", 0) or 0)
+        orders_by_dept[did] = orders_by_dept.get(did, 0) + 1
 
     results = []
-    for d in (depts.data or []):
-        # Get manager name
+    for d in depts:
+        did = d["id"]
         manager_name = ""
-        if d.get("manager_id"):
-            mgr = sb.table("users").select("full_name").eq("id", d["manager_id"]).execute()
-            if mgr.data:
-                manager_name = mgr.data[0]["full_name"]
+        mid = d.get("manager_id")
+        if mid and mid in user_by_id:
+            manager_name = user_by_id[mid].get("full_name", "")
 
-        # Staff count
-        staff = sb.table("users").select("id", count="exact").eq("department_id", d["id"]).eq("role", "staff").execute()
-
-        # Products count (via staff + manager)
-        staff_ids_result = sb.table("users").select("id").eq("department_id", d["id"]).eq("role", "staff").execute()
-        staff_ids = [s["id"] for s in (staff_ids_result.data or [])]
-        # Include manager's own products/transactions
-        if d.get("manager_id") and d["manager_id"] not in staff_ids:
-            staff_ids.append(d["manager_id"])
-
-        product_count = 0
-        low_stock_count = 0
-        if staff_ids:
-            prods = sb.table("products").select("id, stock").in_("seller_id", staff_ids).eq("is_active", True).execute()
-            product_count = len(prods.data) if prods.data else 0
-            low_stock_count = sum(1 for p in (prods.data or []) if int(p.get("stock", 0)) < 5)
-
-        # Revenue and order counts from completed transactions
-        total_revenue = 0
-        total_orders = 0
-        delivery_orders = 0
-        if staff_ids:
-            txns = sb_execute(
-                sb.table("product_transactions").select(
-                    "seller_amount"
-                ).in_("seller_id", staff_ids).in_("status", ["delivered", "completed"])
-            )
-            for t in (txns.data or []):
-                total_revenue += float(t.get("seller_amount", 0))
-                total_orders += 1
-                delivery_orders += 1
-
+        orders = orders_by_dept.get(did, 0)
         results.append({
-            "id": d["id"],
+            "id": did,
             "name": d["name"],
             "description": d.get("description", ""),
-            "manager_id": d.get("manager_id"),
+            "manager_id": mid,
             "manager_name": manager_name,
-            "staff_count": staff.count or 0,
-            "product_count": product_count,
-            "low_stock_count": low_stock_count,
-            "total_revenue": round(total_revenue, 2),
-            "total_orders": total_orders,
-            "delivery_orders": delivery_orders,
+            "staff_count": staff_count_by_dept.get(did, 0),
+            "product_count": product_count_by_dept.get(did, 0),
+            "low_stock_count": low_stock_by_dept.get(did, 0),
+            "total_revenue": round(revenue_by_dept.get(did, 0.0), 2),
+            "total_orders": orders,
+            "delivery_orders": orders,
             "created_at": d["created_at"],
         })
 
@@ -1713,27 +1763,36 @@ async def admin_register_manager(req: ManagerRegisterRequest, admin: dict = Depe
 async def admin_get_pending_removals(admin: dict = Depends(require_admin)):
     """Get all products with status 'pending_removal'."""
     sb = get_supabase()
-    prods = sb.table("products").select("*").eq("status", "pending_removal").order("removal_requested_at", desc=True).execute()
+    prods = sb.table("products").select(_PRODUCT_COLS_WITH_REMOVAL).eq("status", "pending_removal").order("removal_requested_at", desc=True).execute()
+
+    rows = prods.data or []
+    if not rows:
+        return []
+
+    user_ids = set()
+    for p in rows:
+        if p.get("seller_id"):
+            user_ids.add(p["seller_id"])
+        if p.get("removal_requested_by"):
+            user_ids.add(p["removal_requested_by"])
+
+    users_resp = sb.table("users").select("id, full_name, email, department_id").in_("id", list(user_ids)).execute() if user_ids else None
+    user_map = {u["id"]: u for u in (users_resp.data or [])} if users_resp else {}
+
+    dept_ids = list({u.get("department_id") for u in user_map.values() if u.get("department_id")})
+    depts = sb.table("departments").select("id, name").in_("id", dept_ids).execute() if dept_ids else None
+    dept_name_map = {d["id"]: d["name"] for d in (depts.data or [])} if depts else {}
 
     results = []
-    for p in (prods.data or []):
-        seller = sb.table("users").select("full_name, email, department_id").eq("id", p["seller_id"]).execute()
-        seller_info = seller.data[0] if seller.data else {}
-
-        seller_name = seller_info.get("full_name", "Unknown")
+    for p in rows:
+        seller_info = user_map.get(p["seller_id"], {})
         dept_id = seller_info.get("department_id")
-        dept_name = ""
-        if dept_id:
-            dept_resp = sb.table("departments").select("name").eq("id", dept_id).execute()
-            if dept_resp.data:
-                dept_name = dept_resp.data[0]["name"]
-                seller_name = dept_name
+        dept_name = dept_name_map.get(dept_id, "") if dept_id else ""
+        seller_name = dept_name or seller_info.get("full_name", "Unknown")
 
         requester_name = ""
         if p.get("removal_requested_by"):
-            req_user = sb.table("users").select("full_name").eq("id", p["removal_requested_by"]).execute()
-            if req_user.data:
-                requester_name = req_user.data[0]["full_name"]
+            requester_name = user_map.get(p["removal_requested_by"], {}).get("full_name", "")
 
         results.append({
             "id": p["id"],
@@ -1831,15 +1890,12 @@ async def get_deliveries_stats(admin: dict = Depends(require_admin)):
     """Get all deliveries stats including avg delivery time and breakdown by deliveryman."""
     sb = get_supabase()
 
-    # Get all delivery transactions (filter out empty delivery_user_id locally)
+    # Get all delivery transactions — use .not_.is_("delivery_user_id", "null")
+    # to filter server-side, and fetch only the columns we actually use.
     all_txns = sb.table("product_transactions").select(
-        "*"
-    ).order("created_at", desc=False).execute()
-    
-    if all_txns.data:
-        txns_data = [t for t in all_txns.data if t.get("delivery_user_id")]
-    else:
-        txns_data = []
+        "id, delivery_user_id, status, amount, created_at, picked_up_at"
+    ).not_.is_("delivery_user_id", "null").order("created_at", desc=False).execute()
+    txns_data = all_txns.data or []
         
     class AttrDict:
         def __init__(self, d):

@@ -6,11 +6,20 @@ Only accessible by manager users (role='manager').
 from fastapi import APIRouter, HTTPException, Depends, Query
 from pydantic import BaseModel
 from typing import Optional
+from concurrent.futures import ThreadPoolExecutor
 from database import get_supabase
 from routes.auth import get_current_user
 from datetime import datetime, timedelta, timezone
 
 router = APIRouter(prefix="/manager", tags=["Manager"])
+
+_MGR_POOL = ThreadPoolExecutor(max_workers=8, thread_name_prefix="mgr-sb")
+
+# Never select("*") on products — the `embedding` column is a 768-dim vector.
+_PRODUCT_COLS = (
+    "id, seller_id, title, description, price, stock, images, "
+    "tracking_number, is_active, status, created_at"
+)
 
 
 # --- Helpers ---
@@ -54,19 +63,21 @@ async def manager_dashboard(manager: dict = Depends(require_manager)):
     if not dept_id:
         raise HTTPException(status_code=400, detail="Manager is not assigned to a department")
 
-    # Department info
-    dept = sb.table("departments").select("*").eq("id", dept_id).execute()
-    dept_info = dept.data[0] if dept.data else {}
+    # Fan out the independent queries in parallel — the old impl ran 4-5 in series.
+    def run(q):
+        return q.execute()
 
-    # Staff count
-    staff = sb.table("users").select("id", count="exact").eq("department_id", dept_id).eq("role", "staff").execute()
-
-    # Products in department (via staff + manager themselves)
-    staff_ids_result = sb.table("users").select("id").eq("department_id", dept_id).eq("role", "staff").execute()
-    staff_ids = [s["id"] for s in (staff_ids_result.data or [])]
     manager_id = manager["sub"]
-    if manager_id not in staff_ids:
-        staff_ids.append(manager_id)
+    f_dept = _MGR_POOL.submit(run, sb.table("departments").select("*").eq("id", dept_id))
+    f_staff = _MGR_POOL.submit(run, sb.table("users").select("id, role").eq("department_id", dept_id).in_("role", ["staff", "manager"]))
+    f_pending = _MGR_POOL.submit(run, sb.table("restock_requests").select("id", count="exact").eq("department_id", dept_id).eq("status", "pending_manager"))
+
+    dept_info = (f_dept.result().data or [{}])[0]
+    staff_rows = f_staff.result().data or []
+    staff_ids = [s["id"] for s in staff_rows if s.get("role") == "staff"]
+    staff_count = len(staff_ids)
+    all_seller_ids = list({*staff_ids, manager_id})
+    pending_restocks_count = f_pending.result().count or 0
 
     total_products = 0
     total_revenue = 0
@@ -76,14 +87,15 @@ async def manager_dashboard(manager: dict = Depends(require_manager)):
     buyer_ids = set()
     delivery_ids = set()
 
-    if staff_ids:
-        products = sb.table("products").select("id", count="exact").in_("seller_id", staff_ids).execute()
-        total_products = products.count or 0
+    if all_seller_ids:
+        f_products = _MGR_POOL.submit(run, sb.table("products").select("id", count="exact").in_("seller_id", all_seller_ids))
+        f_txns = _MGR_POOL.submit(run, sb.table("product_transactions").select(
+            "buyer_id, delivery_user_id, amount, seller_amount, created_at, purchase_type"
+        ).in_("seller_id", all_seller_ids).in_("status", ["delivered", "completed"]))
 
-        # Revenue from transactions
-        txns = sb.table("product_transactions").select("buyer_id, delivery_user_id, amount, seller_amount, created_at, purchase_type").in_(
-            "seller_id", staff_ids
-        ).in_("status", ["delivered", "completed"]).execute()
+        products = f_products.result()
+        total_products = products.count or 0
+        txns = f_txns.result()
 
         for t in (txns.data or []):
             amt = float(t.get("seller_amount", 0))
@@ -116,22 +128,17 @@ async def manager_dashboard(manager: dict = Depends(require_manager)):
             key=lambda x: x["date"], reverse=True
         )[:30]
 
-    # Pending restock requests
-    pending_restocks = sb.table("restock_requests").select("id", count="exact").eq(
-        "department_id", dept_id
-    ).eq("status", "pending_manager").execute()
-
     return {
         "department": dept_info,
-        "total_staff": staff.count or 0,
+        "total_staff": staff_count,
         "total_products": total_products,
         "total_revenue": round(total_revenue, 2),
-        "pending_restocks": pending_restocks.count or 0,
+        "pending_restocks": pending_restocks_count,
         "daily_sales": to_list(daily_sales),
         "weekly_sales": to_list(weekly_sales),
         "monthly_sales": to_list(monthly_sales),
         "store_buyers": len(buyer_ids),
-        "store_staff": staff.count or 0,
+        "store_staff": staff_count,
         "store_managers": 1,
         "store_delivery": len(delivery_ids),
     }
@@ -149,9 +156,9 @@ async def list_staff(
     if not dept_id:
         raise HTTPException(status_code=400, detail="Manager is not assigned to a department")
 
-    query = sb.table("users").select("*").eq(
-        "department_id", dept_id
-    ).eq("role", "staff")
+    query = sb.table("users").select(
+        "id, email, full_name, role, is_banned, created_at"
+    ).eq("department_id", dept_id).eq("role", "staff")
 
     if search:
         query = query.or_(f"full_name.ilike.%{search}%,email.ilike.%{search}%")
@@ -166,15 +173,19 @@ async def list_staff(
         today_str = datetime.now(timezone.utc).strftime("%Y-%m-%d")
         completed_statuses = ["completed", "delivered"]
 
-        # Fetch completed transactions for all staff (assigned or legacy seller_id)
+        # Restrict to txns that involve these staff — avoids scanning the whole
+        # transactions table. Uses an OR on assigned_staff_id / seller_id.
+        ids_csv = ",".join(f"\"{sid}\"" for sid in all_staff_ids)
         txns = sb.table("product_transactions").select(
             "assigned_staff_id, seller_id, status, quantity, purchase_type, created_at"
-        ).in_("status", completed_statuses).execute()
+        ).in_("status", completed_statuses).or_(
+            f"assigned_staff_id.in.({ids_csv}),seller_id.in.({ids_csv})"
+        ).execute()
 
+        staff_id_set = set(all_staff_ids)
         for t in (txns.data or []):
-            # Determine which staff this belongs to
             staff_id = t.get("assigned_staff_id") or t.get("seller_id")
-            if staff_id not in all_staff_ids:
+            if staff_id not in staff_id_set:
                 continue
 
             if staff_id not in staff_stats:
@@ -689,7 +700,7 @@ async def list_department_products(
     if not staff_ids:
         return []
 
-    query = sb.table("products").select("*").in_("seller_id", staff_ids).order("created_at", desc=True)
+    query = sb.table("products").select(_PRODUCT_COLS).in_("seller_id", staff_ids).order("created_at", desc=True)
 
     if search:
         query = query.ilike("title", f"%{search}%")

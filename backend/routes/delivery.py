@@ -135,7 +135,8 @@ async def get_available_orders(delivery_user: dict = Depends(require_delivery)):
 
     # Fetch all approved transactions not yet assigned to a delivery user
     txns = sb.table("product_transactions").select(
-        "*, products(title, price, images)"
+        "id, buyer_id, seller_id, product_id, group_id, quantity, amount, "
+        "status, delivery_address, created_at, products(title, price, images)"
     ).eq("status", "approved").is_("delivery_user_id", "null").order("created_at", desc=False).limit(200).execute()
 
     if not txns.data:
@@ -154,24 +155,31 @@ async def get_available_orders(delivery_user: dict = Depends(require_delivery)):
     contacts_result = sb.table("user_contacts").select("user_id, contact_number").in_("user_id", buyer_ids).execute()
     buyer_contacts = {c["user_id"]: c["contact_number"] for c in (contacts_result.data or [])}
 
-    # Group and filter: only show groups where ALL items are approved
+    # Group transactions
     raw_groups = {}
+    group_ids_with_real_gid = set()
     for t in txns.data:
         gid = t.get("group_id") or t["id"]
+        if t.get("group_id"):
+            group_ids_with_real_gid.add(t["group_id"])
         if gid not in raw_groups:
-            raw_groups[gid] = {"txns": [], "all_approved": True}
+            raw_groups[gid] = {"txns": []}
         raw_groups[gid]["txns"].append(t)
 
-    # Also check if any transaction in this group has a non-approved status (leftover pending items)
+    # Batch-check for pending items across all groups in one query (was N+1 before).
+    groups_with_pending = set()
+    if group_ids_with_real_gid:
+        pending_rows = sb.table("product_transactions").select("group_id").in_(
+            "group_id", list(group_ids_with_real_gid)
+        ).eq("status", "pending").execute()
+        groups_with_pending = {r["group_id"] for r in (pending_rows.data or []) if r.get("group_id")}
+
     result_groups = []
     for gid, gdata in raw_groups.items():
         group_txns = gdata["txns"]
-        # Check for any pending items in the same group (e.g. buyer added another item just now)
-        pending_check = sb.table("product_transactions").select("id", count="exact").eq(
-            "group_id", gid
-        ).eq("status", "pending").execute()
-        if (pending_check.count or 0) > 0:
-            continue  # Skip — group still has pending items
+        # Skip groups that still have pending items waiting for staff approval
+        if gid in groups_with_pending:
+            continue
 
         # Build item list
         buyer_id = group_txns[0]["buyer_id"]
@@ -214,7 +222,8 @@ async def get_active_deliveries(delivery_user: dict = Depends(require_delivery))
     user_id = delivery_user["sub"]
 
     txns = sb.table("product_transactions").select(
-        "*, products(title, price, images)"
+        "id, buyer_id, seller_id, product_id, group_id, quantity, amount, "
+        "status, delivery_address, created_at, products(title, price, images)"
     ).eq("delivery_user_id", user_id).eq("status", "ondeliver").order("created_at", desc=False).execute()
 
     if not txns.data:

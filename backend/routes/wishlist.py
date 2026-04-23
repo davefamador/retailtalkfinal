@@ -37,36 +37,32 @@ async def get_wishlist(current_user: dict = Depends(get_current_user)):
     user_id = current_user["sub"]
 
     wishlist_data = sb.table("wishlist_items").select(
-        "*, products(id, title, description, price, seller_id, images, stock)"
+        "id, created_at, products(id, title, description, price, seller_id, images, stock)"
     ).eq("buyer_id", user_id).order("created_at", desc=True).execute()
 
-    items = []
-    seller_name_cache = {}
+    rows = wishlist_data.data or []
+    if not rows:
+        return []
 
-    for w in (wishlist_data.data or []):
+    # Batch-resolve seller names (dept name if present, else full_name) in exactly
+    # two queries instead of two per row.
+    seller_ids = list({w["products"]["seller_id"] for w in rows if w.get("products")})
+    sellers = sb.table("users").select("id, full_name, department_id").in_("id", seller_ids).execute() if seller_ids else None
+    seller_map = {s["id"]: s for s in (sellers.data or [])} if sellers else {}
+
+    dept_ids = list({s.get("department_id") for s in seller_map.values() if s.get("department_id")})
+    depts = sb.table("departments").select("id, name").in_("id", dept_ids).execute() if dept_ids else None
+    dept_name_map = {d["id"]: d["name"] for d in (depts.data or [])} if depts else {}
+
+    items = []
+    for w in rows:
         prod = w.get("products")
         if not prod:
             continue
-
         sid = prod["seller_id"]
-        if sid not in seller_name_cache:
-            seller_resp = sb.table("users").select("full_name, department_id").eq("id", sid).execute()
-            if seller_resp.data:
-                full_name = seller_resp.data[0]["full_name"]
-                dept_id = seller_resp.data[0].get("department_id")
-                if dept_id:
-                    dept_resp = sb.table("departments").select("name").eq("id", dept_id).execute()
-                    if dept_resp.data:
-                        seller_name_cache[sid] = dept_resp.data[0]["name"]
-                    else:
-                        seller_name_cache[sid] = full_name
-                else:
-                    seller_name_cache[sid] = full_name
-            else:
-                seller_name_cache[sid] = "Seller"
-
+        seller = seller_map.get(sid, {})
+        seller_name = dept_name_map.get(seller.get("department_id")) or seller.get("full_name") or "Seller"
         images = prod.get("images") or []
-
         items.append(WishlistItemResponse(
             id=w["id"],
             product_id=prod["id"],
@@ -74,8 +70,8 @@ async def get_wishlist(current_user: dict = Depends(get_current_user)):
             description=prod.get("description", ""),
             price=float(prod["price"]),
             stock=int(prod.get("stock", 0)),
-            seller_id=prod["seller_id"],
-            seller_name=seller_name_cache[sid],
+            seller_id=sid,
+            seller_name=seller_name,
             image_url=images[0] if images else "",
             created_at=w["created_at"],
         ))
