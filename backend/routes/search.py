@@ -202,18 +202,25 @@ def _run_search_pipeline(
     else:
         ranker_scores = [c["similarity"] for c in candidates]
 
-    product_embeddings = np.array([c["embedding"] for c in candidates])
-    if classifier_service._loaded:
+    # For multi-group queries each group term is short/vague (e.g. "toys", "snacks").
+    # The ESCI classifier was trained on full focused queries — it produces unreliable
+    # Irrelevant labels on short terms, so skip it and treat all candidates as Exact.
+    exact_default = [{"label": "Exact", "confidence": 1.0, "class_id": 0,
+                      "exact_prob": 1.0, "substitute_prob": 0.0,
+                      "complement_prob": 0.0, "irrelevant_prob": 0.0}
+                     for _ in candidates]
+    if is_multi_group:
+        classifications = exact_default
+    elif classifier_service._loaded:
+        product_embeddings = np.array([c["embedding"] for c in candidates])
         classifications = classifier_service.classify_batch(query_embedding, product_embeddings)
     else:
-        classifications = [{"label": "Exact", "confidence": 1.0, "class_id": 0,
-            "exact_prob": 1.0, "substitute_prob": 0.0, "complement_prob": 0.0, "irrelevant_prob": 0.0}
-            for _ in candidates]
+        classifications = exact_default
 
-    # Multi-group queries use short vague terms — CrossEncoder is unreliable on them.
-    # Shift weight toward similarity and lower the threshold so results aren't wiped out.
+    # Multi-group: shift weight toward similarity, drop classifier weight, lower threshold.
+    # Single query: standard weights, strict threshold.
     if is_multi_group:
-        w_r, w_c, w_s = (0.30, 0.05, 0.65) if ranker_service._loaded else (0.0, 0.05, 0.95)
+        w_r, w_c, w_s = (0.35, 0.0, 0.65) if ranker_service._loaded else (0.0, 0.0, 1.0)
         MIN_RELEVANCE_SCORE = 0.45
     else:
         w_r, w_c, w_s = (0.55, 0.05, 0.40) if ranker_service._loaded else (0.0, 0.05, 0.95)
