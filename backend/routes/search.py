@@ -202,23 +202,18 @@ def _run_search_pipeline(
     else:
         ranker_scores = [c["similarity"] for c in candidates]
 
-    # For multi-group queries each group term is short/vague (e.g. "toys", "snacks").
-    # The ESCI classifier was trained on full focused queries — it produces unreliable
-    # Irrelevant labels on short terms, so skip it and treat all candidates as Exact.
-    exact_default = [{"label": "Exact", "confidence": 1.0, "class_id": 0,
-                      "exact_prob": 1.0, "substitute_prob": 0.0,
-                      "complement_prob": 0.0, "irrelevant_prob": 0.0}
-                     for _ in candidates]
-    if is_multi_group:
-        classifications = exact_default
-    elif classifier_service._loaded:
-        product_embeddings = np.array([c["embedding"] for c in candidates])
+    product_embeddings = np.array([c["embedding"] for c in candidates])
+    if classifier_service._loaded:
         classifications = classifier_service.classify_batch(query_embedding, product_embeddings)
     else:
-        classifications = exact_default
+        classifications = [{"label": "Exact", "confidence": 1.0, "class_id": 0,
+                            "exact_prob": 1.0, "substitute_prob": 0.0,
+                            "complement_prob": 0.0, "irrelevant_prob": 0.0}
+                           for _ in candidates]
 
-    # Multi-group: shift weight toward similarity, drop classifier weight, lower threshold.
-    # Single query: standard weights, strict threshold.
+    # Multi-group: short vague group terms make the ESCI label unreliable for filtering.
+    # Zero out classifier weight so it doesn't affect scoring, and don't gate on the label.
+    # Single query: full weights, label-based filtering applies normally.
     if is_multi_group:
         w_r, w_c, w_s = (0.35, 0.0, 0.65) if ranker_service._loaded else (0.0, 0.0, 1.0)
         MIN_RELEVANCE_SCORE = 0.45
@@ -231,14 +226,14 @@ def _run_search_pipeline(
         r_score = float(ranker_scores[idx])
         sim = float(cand["similarity"])
         rel = _compute_blended_score(r_score, _label_to_priority_weight(label), sim, w_r, w_c, w_s)
-        # All labels (including Exact) must meet the minimum relevance threshold.
-        # Irrelevant products are shown only if they score >= 0.75; otherwise dropped.
         if not show_all and rel < MIN_RELEVANCE_SCORE:
             continue
-        if not show_all and label == "Substitute" and not include_substitutes:
-            continue
-        if not show_all and label == "Complement" and not include_complements:
-            continue
+        # For multi-group, don't filter by ESCI label — pgvector+ranker already confirmed relevance
+        if not is_multi_group:
+            if not show_all and label == "Substitute" and not include_substitutes:
+                continue
+            if not show_all and label == "Complement" and not include_complements:
+                continue
         scored.append(SearchResultItem(
             id=str(cand["id"]), title=cand["title"],
             description=cand.get("description") or "",
