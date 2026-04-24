@@ -419,7 +419,7 @@ async def get_staff_detail(user_id: str, manager: dict = Depends(require_manager
     )[:20]
 
     # Products
-    prods = sb.table("products").select("id, title, price, stock, images, is_active, created_at").eq("seller_id", user_id).order("created_at", desc=True).limit(50).execute()
+    prods = sb.table("products").select("id, title, price, stock, images, is_active, created_at").eq("seller_id", user_id).neq("status", "removed").order("created_at", desc=True).limit(50).execute()
     products = [
         {
             "id": p["id"],
@@ -700,7 +700,7 @@ async def list_department_products(
     if not staff_ids:
         return []
 
-    query = sb.table("products").select(_PRODUCT_COLS).in_("seller_id", staff_ids).order("created_at", desc=True)
+    query = sb.table("products").select(_PRODUCT_COLS).in_("seller_id", staff_ids).neq("status", "removed").order("created_at", desc=True)
 
     if search:
         query = query.ilike("title", f"%{search}%")
