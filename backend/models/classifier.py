@@ -63,14 +63,9 @@ class ClassifierService:
 
     # Softmax temperature: values > 1 soften the distribution to counteract
     # the model's strong bias toward the Exact class from training.
-    # T=2.5 plus a margin tiebreaker lets S/C/I surface when there's real
-    # evidence, while preventing razor-thin flips from misclassifying clear Exacts.
+    # T=2.5 calibrates overconfident predictions caused by class imbalance,
+    # allowing S/C/I labels to surface when there's real evidence.
     SOFTMAX_TEMPERATURE = 2.5
-
-    # If the top non-Exact class leads Exact by less than this margin,
-    # break the tie in favor of Exact. Prevents noisy Irrelevant labels on
-    # borderline cases while still allowing decisive S/C/I classifications.
-    EXACT_TIEBREAK_MARGIN = 0.08
 
     def __init__(self):
         self.model = None
@@ -103,20 +98,12 @@ class ClassifierService:
 
     def _classify_from_probs(self, probs: np.ndarray) -> int:
         """
-        Determine class ID using argmax with an Exact-class tiebreaker.
+        Determine class ID using standard argmax — highest probability wins.
 
         probs: shape (4,) — [exact, substitute, complement, irrelevant]
         Returns: class_id (int)
-
-        If another class narrowly beats Exact (within EXACT_TIEBREAK_MARGIN),
-        default to Exact — the model is known to be biased toward Exact in
-        training, so close calls with softened probabilities should fall back
-        to the stronger prior. Decisive non-Exact predictions still stand.
         """
-        top = int(np.argmax(probs))
-        if top != 0 and (probs[top] - probs[0]) < self.EXACT_TIEBREAK_MARGIN:
-            return 0
-        return top
+        return int(np.argmax(probs))
 
     def classify(self, query_embedding: np.ndarray, product_embedding: np.ndarray) -> dict:
         """
