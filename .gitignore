@@ -6,13 +6,11 @@
 .env.*.local
 
 # ========================
-# Large model weights — stored in HuggingFace Model Hub instead
-# Downloaded at Docker build time via download_models.py
+# Large model weights — downloaded automatically on first run from HuggingFace
+# See backend/download_models.py
 # ========================
-backend/trained_model/intent_classifier/model.pt
-backend/trained_model/slot_extractor/model.pt
-backend/trained_model/ranker/model.safetensors
-backend/trained_model/pytorch_model.bin
+aimodels/
+backend/trained_model/
 checkpoint.pt
 *.pth
 *.onnx

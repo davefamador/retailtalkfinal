@@ -19,6 +19,10 @@ async def lifespan(app: FastAPI):
     # --- Startup ---
     print(f"[START] Starting {APP_NAME} backend...")
 
+    # Download model weights if aimodels/ folder is missing any file
+    from download_models import download_models
+    download_models()
+
     # Load ML models
     from models.bert_service import bert_service
     from models.classifier import classifier_service
