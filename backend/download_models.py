@@ -6,6 +6,7 @@ Requires HF_TOKEN env var if the model repo is private.
 
 import os
 from huggingface_hub import hf_hub_download
+from huggingface_hub.errors import RemoteEntryNotFoundError, RepositoryNotFoundError
 
 REPO_ID = "dashm/retailtalk-models"
 TOKEN = os.getenv("HF_TOKEN") or None
@@ -26,12 +27,15 @@ for local_rel, hub_filename in files:
         continue
     print(f"[download] {hub_filename} -> {local_rel}")
     os.makedirs(os.path.dirname(local_path), exist_ok=True)
-    hf_hub_download(
-        repo_id=REPO_ID,
-        filename=hub_filename,
-        local_dir=os.path.join(base_dir, "trained_model"),
-        token=TOKEN,
-    )
-    print(f"[done] {local_rel}")
+    try:
+        hf_hub_download(
+            repo_id=REPO_ID,
+            filename=hub_filename,
+            local_dir=os.path.join(base_dir, "trained_model"),
+            token=TOKEN,
+        )
+        print(f"[done] {local_rel}")
+    except (RemoteEntryNotFoundError, RepositoryNotFoundError) as e:
+        print(f"[miss] {hub_filename} not found on Hub — service will run without this model")
 
-print("[OK] All models downloaded.")
+print("[OK] Model download step finished.")
