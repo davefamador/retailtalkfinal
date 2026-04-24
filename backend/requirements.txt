@@ -1,4 +1,4 @@
-# SmartShop Backend - Python Dependencies
+# RetailTalk Backend - Python Dependencies
 
 # Web framework
 fastapi==0.115.0
@@ -7,6 +7,11 @@ python-dotenv==1.0.1
 
 # Database
 supabase==2.7.2
+postgrest==0.16.11
+gotrue==2.11.4
+realtime==2.5.3
+storage3==0.7.7
+supafunc==0.5.1
 psycopg[binary]==3.3.2
 
 # ML / AI
@@ -20,9 +25,9 @@ bcrypt==4.2.0
 python-multipart==0.0.9
 
 # CORS & other
-pydantic[email]==2.9.0
+pydantic[email]>=2.9.0
 
-# HuggingFace Hub (for downloading model weights at build time)
+# HuggingFace Hub (for downloading model weights at runtime)
 huggingface_hub>=0.24.0
 
 # Voice search (speech-to-text)
