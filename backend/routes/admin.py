@@ -1570,35 +1570,27 @@ async def delete_department(dept_id: str, admin: dict = Depends(require_admin)):
 
 @router.delete("/products/{product_id}")
 async def admin_delete_product(product_id: str, admin: dict = Depends(require_admin)):
-    """Delete a product. Soft-deletes when transaction history exists (to preserve
-    order records), hard-deletes when no transactions reference this product."""
+    """Soft-delete a product. The product row is always kept so that all
+    transaction history, order records, and reports continue to reference it.
+    Cart/wishlist/restock entries are cleaned up; transactions are untouched."""
     sb = get_supabase()
     existing = sb.table("products").select("id").eq("id", product_id).execute()
     if not existing.data:
         raise HTTPException(status_code=404, detail="Product not found")
 
-    # Check if any transactions reference this product
-    txns = sb.table("product_transactions").select("id", count="exact").eq("product_id", product_id).execute()
-    has_transactions = (txns.count or 0) > 0
+    # Remove active-only references that have no historical value
+    sb.table("cart_items").delete().eq("product_id", product_id).execute()
+    sb.table("wishlist_items").delete().eq("product_id", product_id).execute()
+    sb.table("restock_requests").delete().eq("product_id", product_id).execute()
 
-    if has_transactions:
-        # Soft-delete: deactivate product to preserve transaction history
-        sb.table("restock_requests").delete().eq("product_id", product_id).execute()
-        sb.table("cart_items").delete().eq("product_id", product_id).execute()
-        sb.table("wishlist_items").delete().eq("product_id", product_id).execute()
-        sb.table("products").update({
-            "is_active": False,
-            "status": "removed",
-            "stock": 0,
-        }).eq("id", product_id).execute()
-        return {"message": "Product deactivated (transaction history preserved)"}
-    else:
-        # Hard-delete: no transactions, safe to fully remove
-        sb.table("restock_requests").delete().eq("product_id", product_id).execute()
-        sb.table("cart_items").delete().eq("product_id", product_id).execute()
-        sb.table("wishlist_items").delete().eq("product_id", product_id).execute()
-        sb.table("products").delete().eq("id", product_id).execute()
-        return {"message": "Product deleted successfully"}
+    # Always soft-delete: keeps the row so transactions/reports stay intact
+    sb.table("products").update({
+        "is_active": False,
+        "status": "removed",
+        "stock": 0,
+    }).eq("id", product_id).execute()
+
+    return {"message": "Product deleted successfully"}
 
 
 # --- Admin Create Product for Department ---
