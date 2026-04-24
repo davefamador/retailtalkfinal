@@ -51,7 +51,6 @@ Thumbs.db
 # ========================
 # Not needed for HF Space deployment
 # ========================
-frontend/
 database/
 train/
 aimodels/
