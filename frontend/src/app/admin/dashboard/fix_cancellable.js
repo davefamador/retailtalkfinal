@@ -1,0 +1,10 @@
+const fs = require('fs');
+const f = 'Dashboardpage.js';
+let c = fs.readFileSync(f, 'utf8');
+const old = "const cancellable = t.status !== 'delivered' && t.status !== 'cancelled';";
+const rep = "const cancellable = t.status !== 'delivered' && t.status !== 'cancelled' && t.status !== 'rejected_manager';";
+const n = c.split(old).length - 1;
+console.log('occurrences found:', n);
+c = c.replaceAll(old, rep);
+fs.writeFileSync(f, c, 'utf8');
+console.log('done');
