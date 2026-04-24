@@ -5,6 +5,7 @@ WORKDIR /app
 # Install system dependencies
 RUN apt-get update && apt-get install -y \
     build-essential \
+    ffmpeg \
     && rm -rf /var/lib/apt/lists/* \
     && echo 'precedence ::ffff:0:0/96  100' >> /etc/gai.conf
 
