@@ -26,18 +26,26 @@ class RankerService:
             return
 
         model_path = RANKER_MODEL_PATH
-        if not os.path.exists(model_path):
-            print(f"[RankerService] WARNING: Model not found at {model_path}")
+        weights_present = os.path.exists(os.path.join(model_path, "model.safetensors")) or \
+                          os.path.exists(os.path.join(model_path, "pytorch_model.bin"))
+        if not weights_present:
+            print(f"[RankerService] WARNING: No weights file in {model_path}")
             print("[RankerService] Search will use classification-only ranking (no CrossEncoder re-ranking)")
             return
 
         print(f"[RankerService] Loading CrossEncoder from {model_path}...")
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-        self.model = AutoModelForSequenceClassification.from_pretrained(model_path).to(self.device)
-        self.tokenizer = AutoTokenizer.from_pretrained(model_path)
-        self.model.eval()
-        self._loaded = True
-        print(f"[RankerService] CrossEncoder loaded on {self.device}")
+        try:
+            self.model = AutoModelForSequenceClassification.from_pretrained(model_path).to(self.device)
+            self.tokenizer = AutoTokenizer.from_pretrained(model_path)
+            self.model.eval()
+            self._loaded = True
+            print(f"[RankerService] CrossEncoder loaded on {self.device}")
+        except Exception as e:
+            print(f"[RankerService] WARNING: Failed to load model: {e}")
+            print("[RankerService] Search will use classification-only ranking (no CrossEncoder re-ranking)")
+            self.model = None
+            self.tokenizer = None
 
     def rank(self, query: str, product_titles: list[str], batch_size: int = 64) -> np.ndarray:
         """
