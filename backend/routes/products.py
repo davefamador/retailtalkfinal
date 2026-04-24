@@ -273,7 +273,7 @@ async def list_my_products(current_user: dict = Depends(get_current_user)):
             if manager_id not in seller_ids:
                 seller_ids.append(manager_id)
 
-    result = sb.table("products").select(_PRODUCT_COLS).in_("seller_id", seller_ids).order("created_at", desc=True).execute()
+    result = sb.table("products").select(_PRODUCT_COLS).in_("seller_id", seller_ids).neq("status", "removed").order("created_at", desc=True).execute()
 
     return [build_product_response(p) for p in result.data]
 
@@ -285,6 +285,9 @@ async def get_product(product_id: str):
     result = sb.table("products").select(_PRODUCT_COLS + ", users!products_seller_id_fkey(full_name, department_id)").eq("id", product_id).execute()
 
     if not result.data:
+        raise HTTPException(status_code=404, detail="Product not found")
+
+    if result.data[0].get("status") == "removed":
         raise HTTPException(status_code=404, detail="Product not found")
 
     p = result.data[0]

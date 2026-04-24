@@ -794,9 +794,9 @@ async def list_admin_products(
 
     product_cols = _PRODUCT_COLS + ", users!products_seller_id_fkey(full_name, department_id)"
     if search:
-        products = sb.table("products").select(product_cols).ilike("title", f"%{search}%").order("created_at", desc=True).limit(200).execute()
+        products = sb.table("products").select(product_cols).neq("status", "removed").ilike("title", f"%{search}%").order("created_at", desc=True).limit(200).execute()
     else:
-        products = sb.table("products").select(product_cols).order("created_at", desc=True).limit(200).execute()
+        products = sb.table("products").select(product_cols).neq("status", "removed").order("created_at", desc=True).limit(200).execute()
 
     # Batch-lookup department names
     dept_ids = set()
@@ -1034,7 +1034,7 @@ async def get_user_detail(user_id: str, admin: dict = Depends(require_admin)):
     # 5. Seller products (if user is a seller)
     seller_products = []
     if u["role"] == "staff":
-        prods = sb.table("products").select("id, title, price, stock, images, is_active, created_at").eq("seller_id", user_id).order("created_at", desc=True).limit(50).execute()
+        prods = sb.table("products").select("id, title, price, stock, images, is_active, created_at").eq("seller_id", user_id).neq("status", "removed").order("created_at", desc=True).limit(50).execute()
         seller_products = [
             {
                 "id": p["id"],
