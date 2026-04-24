@@ -24,3 +24,7 @@ pydantic[email]==2.9.0
 
 # HuggingFace Hub (for downloading model weights at build time)
 huggingface_hub>=0.24.0
+
+# Voice search (speech-to-text)
+SpeechRecognition>=3.10.0
+pydub>=0.25.1
