@@ -1293,7 +1293,6 @@ export default function AdminDashboard() {
                 { id: 'users', icon: Users, label: 'Users' },
                 { id: 'departments', icon: Store, label: 'Stores' },
                 { id: 'deliveries', icon: Truck, label: 'Deliveries' },
-                { id: 'salaries', icon: DollarSign, label: 'Salaries' },
             ]
         },
         {

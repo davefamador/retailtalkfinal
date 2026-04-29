@@ -71,33 +71,14 @@ export default function ProductDetailPage() {
             setError('Only buyer accounts can purchase products.');
             return;
         }
-        setBuying(true);
         setError('');
         setSuccess('');
         try {
-            await buyProduct(product.id, quantity);
-            setSuccess(`Successfully purchased ${quantity}x ${product.title}!`);
-            window.dispatchEvent(new Event('balance-updated'));
-            // Remove from cart if the product was there
-            removeFromCart(product.id).catch(() => {});
-            const updated = await getProduct(params.id);
-            setProduct(updated);
-            setQuantity(1);
-        } catch (err) {
-            const msg = err.message || '';
-            if (msg.includes('delivery address') || msg.includes('contact number')) {
-                try {
-                    const c = await getMyContact();
-                    setContactNum(c.contact_number || '');
-                    setDeliveryAddr(c.delivery_address || '');
-                } catch (_) {}
-                setAddressModal(true);
-            } else {
-                setError(msg);
-            }
-        } finally {
-            setBuying(false);
-        }
+            const c = await getMyContact();
+            setContactNum(c.contact_number || '');
+            setDeliveryAddr(c.delivery_address || '');
+        } catch (_) {}
+        setAddressModal(true);
     };
 
     const canEditImages = user && (user.role === 'admin' || user.role === 'manager');
@@ -466,9 +447,9 @@ export default function ProductDetailPage() {
                         boxShadow: '0 20px 60px rgba(0,0,0,0.5)',
                     }}
                 >
-                    <h3 style={{ fontSize: '1.2rem', fontWeight: 800, marginBottom: 8 }}>📍 Delivery Address Required</h3>
+                    <h3 style={{ fontSize: '1.2rem', fontWeight: 800, marginBottom: 8 }}>📍 Confirm Delivery Details</h3>
                     <p style={{ color: 'var(--text-muted)', fontSize: '0.85rem', marginBottom: 20 }}>
-                        Please provide your contact number and delivery address to place a delivery order.
+                        Review or update your delivery address. You can ship to a different location if needed.
                     </p>
 
                     {error && (
