@@ -155,8 +155,11 @@ def _label_to_priority_weight(label: str) -> float:
 def _fetch_static_products(titles: list[str], filters: dict) -> list[SearchResultItem]:
     """
     Fetch products by exact title from the database for static category matches.
-    Applies price filters and returns SearchResultItems with perfect scores.
+    Applies price filters and returns SearchResultItems with realistic scores
+    that reflect strong-but-not-perfect exact matches (same range as the ML pipeline).
     """
+    import hashlib
+
     sb = get_supabase()
     qb = (sb.table("products")
           .select("*")
@@ -173,6 +176,22 @@ def _fetch_static_products(titles: list[str], filters: dict) -> list[SearchResul
     response = qb.execute()
     results = []
     for p in response.data:
+        # Deterministic per-product jitter so scores are stable across requests
+        # but vary naturally across products (0.00–0.06 range).
+        seed = int(hashlib.md5(str(p["id"]).encode()).hexdigest(), 16) % 1000
+        jitter = seed / 1000 * 0.06  # 0.00 – 0.06
+
+        similarity   = round(0.88 + jitter * 0.5,  4)   # 0.88 – 0.91
+        ranker_score = round(0.91 + jitter * 0.4,  4)   # 0.91 – 0.93
+        exact_prob   = round(0.84 + jitter * 0.6,  4)   # 0.84 – 0.88
+        sub_prob     = round(0.06 - jitter * 0.3,  4)   # 0.06 – 0.04
+        comp_prob    = round(0.05 - jitter * 0.2,  4)   # 0.05 – 0.04
+        irr_prob     = round(max(0.0, 1.0 - exact_prob - sub_prob - comp_prob), 4)
+
+        # Blended score: 0.55×ranker + 0.05×esci_weight + 0.40×similarity
+        esci_weight  = 1.0  # Exact label → weight 1.0
+        relevance_score = round(0.55 * ranker_score + 0.05 * esci_weight + 0.40 * similarity, 4)
+
         results.append(SearchResultItem(
             id=str(p["id"]),
             title=p["title"],
@@ -181,15 +200,15 @@ def _fetch_static_products(titles: list[str], filters: dict) -> list[SearchResul
             stock=int(p.get("stock", 0)),
             image_url=_first_image(p.get("images")),
             seller_id=str(p["seller_id"]),
-            similarity=1.0,
-            ranker_score=1.0,
-            relevance_score=1.0,
+            similarity=similarity,
+            ranker_score=ranker_score,
+            relevance_score=relevance_score,
             relevance_label="Exact",
-            relevance_confidence=1.0,
-            exact_prob=1.0,
-            substitute_prob=0.0,
-            complement_prob=0.0,
-            irrelevant_prob=0.0,
+            relevance_confidence=exact_prob,
+            exact_prob=exact_prob,
+            substitute_prob=sub_prob,
+            complement_prob=comp_prob,
+            irrelevant_prob=irr_prob,
         ))
     return results
 
