@@ -54,6 +54,7 @@ from models.bert_service import bert_service
 from models.classifier import classifier_service, LABEL_PRIORITY
 from models.ranker import ranker_service
 from models.query_rewriter import query_rewriter
+from models.static_search import match_static_category
 from database import search_similar_products, search_similar_products_filtered, get_supabase
 from config import (
     SEARCH_TOP_K_CANDIDATES,
@@ -149,6 +150,97 @@ def _label_to_priority_weight(label: str) -> float:
     """
     priority = LABEL_PRIORITY.get(label, 3)  # Default to Irrelevant (3)
     return (3 - priority) / 3
+
+
+def _fetch_static_products(titles: list[str], filters: dict) -> list[SearchResultItem]:
+    """
+    Fetch products by exact title from the database for static category matches.
+    Applies price filters and returns SearchResultItems with perfect scores.
+    """
+    sb = get_supabase()
+    qb = (sb.table("products")
+          .select("*")
+          .eq("is_active", True)
+          .eq("status", "approved")
+          .gt("stock", 0)
+          .in_("title", titles))
+
+    if filters.get("price_max") is not None:
+        qb = qb.lte("price", filters["price_max"])
+    if filters.get("price_min") is not None:
+        qb = qb.gte("price", filters["price_min"])
+
+    response = qb.execute()
+    results = []
+    for p in response.data:
+        results.append(SearchResultItem(
+            id=str(p["id"]),
+            title=p["title"],
+            description=p.get("description") or "",
+            price=float(p["price"]),
+            stock=int(p.get("stock", 0)),
+            image_url=_first_image(p.get("images")),
+            seller_id=str(p["seller_id"]),
+            similarity=1.0,
+            ranker_score=1.0,
+            relevance_score=1.0,
+            relevance_label="Exact",
+            relevance_confidence=1.0,
+            exact_prob=1.0,
+            substitute_prob=0.0,
+            complement_prob=0.0,
+            irrelevant_prob=0.0,
+        ))
+    return results
+
+
+def _try_static_search(rewritten, max_results: int):
+    """
+    Check if the rewritten query matches static product categories.
+    Each search group is checked independently so compound queries
+    like 'snacks less than 20 and halal food' work correctly with
+    per-group price filters.
+
+    Returns list of SearchResultItems if ALL groups match static categories,
+    None otherwise (falls through to the ML pipeline).
+    """
+    try:
+        # Guard: if no search groups exist, fall through to ML pipeline
+        if not rewritten.search_groups:
+            print(f"[Search] Static check: no search groups — skipping")
+            return None
+
+        all_results = []
+
+        for i, group in enumerate(rewritten.search_groups):
+            titles = match_static_category(group.search_text)
+            if titles is None:
+                # At least one group doesn't match — fall through to ML pipeline
+                print(f"[Search] Static check: group {i+1} '{group.search_text}' → no match — falling through")
+                return None
+            print(f"[Search] Static check: group {i+1} '{group.search_text}' → matched {len(titles)} titles")
+            group_results = _fetch_static_products(titles, group.filters)
+            all_results.extend(group_results)
+
+        # No products matched any static category — fall through
+        if not all_results:
+            print(f"[Search] Static check: categories matched but 0 products found in DB — falling through")
+            return None
+
+        # Deduplicate by product id (keep first occurrence)
+        seen = {}
+        for r in all_results:
+            if r.id not in seen:
+                seen[r.id] = r
+
+        final = list(seen.values())[:max_results]
+        print(f"[Search] Static category match: {len(final)} products returned")
+        return final
+
+    except Exception as e:
+        # Never let static search break the normal pipeline
+        print(f"[Search] Static search error (falling through to ML): {e}")
+        return None
 
 
 def _run_search_pipeline(
@@ -301,6 +393,26 @@ async def search_products(
         print(f"[Search] Search groups: {len(rewritten.search_groups)}")
         for i, g in enumerate(rewritten.search_groups):
             print(f"[Search]   Group {i+1}: '{g.search_text}' | Filters: {g.filters}")
+
+        # === STATIC CATEGORY CHECK ===
+        # Check if search groups match hardcoded product categories
+        # (e.g., halal food, lenten food, snacks, summer food)
+        static_results = _try_static_search(rewritten, max_results)
+        if static_results is not None and len(static_results) > 0:
+            print(f"[Search] ✓ Static match — returning {len(static_results)} products (skipping ML pipeline)")
+            return SearchResponse(
+                query=q,
+                total_results=len(static_results),
+                results=static_results,
+                message="",
+                rewritten_query=rewritten.search_text,
+                detected_intents=rewritten.intents,
+                extracted_slots=rewritten.slots,
+                applied_filters=rewritten.search_groups[0].filters if len(rewritten.search_groups) == 1 else {},
+                search_groups=[{"search_text": g.search_text, "filters": g.filters} for g in rewritten.search_groups],
+            )
+        else:
+            print(f"[Search] ✗ No static match — proceeding to ML pipeline")
 
         if not bert_service._loaded:
             return await _fallback_text_search(q, rewritten, max_results)

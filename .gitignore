@@ -53,5 +53,7 @@ Thumbs.db
 # ========================
 frontend/
 database/
+train/
+aimodels/
 backend/test_*.py
 backend/Dockerfile
