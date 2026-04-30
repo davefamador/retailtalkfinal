@@ -18,7 +18,6 @@ Supports:
 
 # Category keyword (lowercased) -> list of exact product titles in the database
 STATIC_CATEGORIES = {
-
     "Beef":["Beef Rendang"],
     "BeefRendang":["Beef Rendang"],
     "Tiyula Itum":["Tiyula Itum"],
@@ -147,6 +146,10 @@ SUMMER_KEYWORDS = {"summer food", "summer foods"}
 #  Matching Logic
 # =============================================================================
 
+# Lowercase-keyed version of STATIC_CATEGORIES for case-insensitive lookup
+_STATIC_CATEGORIES_LOWER = {k.lower(): v for k, v in STATIC_CATEGORIES.items()}
+
+
 def match_static_category(search_text: str) -> list[str] | None:
     """
     Check if a search text matches a static product category.
@@ -159,9 +162,9 @@ def match_static_category(search_text: str) -> list[str] | None:
     """
     normalized = search_text.lower().strip()
 
-    # Check direct category matches
-    if normalized in STATIC_CATEGORIES:
-        return list(STATIC_CATEGORIES[normalized])
+    # Check direct category matches (case-insensitive)
+    if normalized in _STATIC_CATEGORIES_LOWER:
+        return list(_STATIC_CATEGORIES_LOWER[normalized])
 
     # Check summer food keywords
     if normalized in SUMMER_KEYWORDS:
