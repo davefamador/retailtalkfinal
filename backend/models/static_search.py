@@ -32,12 +32,12 @@ STATIC_CATEGORIES = {
     "Binignit":["Binignit"],
     "Buko Juice":["Buko Juice"],
     
-    "canned goods": ["Sardines","Luncheon Meat", "Pate", "Meat Loaf", "Corned Beef"],
-    "canned good": ["Sardines", "Luncheon Meat", "Pate", "Meat Loaf", "Corned Beef"],
-    "canned products": ["Sardines", "Luncheon Meat", "Pate", "Meat Loaf", "Corned Beef"],
-    "canned product": ["Sardines", "Luncheon Meat", "Pate", "Meat Loaf", "Corned Beef"],
-    "canned food": ["Sardines", "Luncheon Meat", "Pate", "Meat Loaf", "Corned Beef"],
-    "canned": ["Sardines", "Luncheon Meat", "Pate", "Meat Loaf", "Corned Beef"],
+    "canned goods": ["Sardines","Luncheon Meat", "Meat Loaf", "Corned Beef"],
+    "canned good": ["Sardines", "Luncheon Meat", "Meat Loaf", "Corned Beef"],
+    "canned products": ["Sardines", "Luncheon Meat",  "Meat Loaf", "Corned Beef"],
+    "canned product": ["Sardines", "Luncheon Meat",  "Meat Loaf", "Corned Beef"],
+    "canned food": ["Sardines", "Luncheon Meat", "Meat Loaf", "Corned Beef"],
+    "canned": ["Sardines", "Luncheon Meat", "Meat Loaf", "Corned Beef"],
 
     "Sardines":["Sardines"],
     "Sardine":["Sardines"],
@@ -52,6 +52,9 @@ STATIC_CATEGORIES = {
     "Bread":["Gardenia Classic White Bread"],
     "White Bread":["Gardenia Classic White Bread"],
     
+    "clothes": ["Raincoat", "Rain Boots", "Waterproof Jacket", "shorts", "flip flops", "shirt", "casual sleeveless tops", "Sarouel Pants","Jacket","Keffiyeh","Long Sleeve","Summer Hat","Hat"],
+    "clothing": ["Raincoat", "Rain Boots", "Waterproof Jacket", "shorts", "flip flops", "shirt", "casual sleeveless tops", "Sarouel Pants","Jacket","Keffiyeh","Long Sleeve","Summer Hat","Hat"],
+    "clothings": ["Raincoat", "Rain Boots", "Waterproof Jacket", "shorts", "flip flops", "shirt", "casual sleeveless tops", "Sarouel Pants","Jacket","Keffiyeh","Long Sleeve","Summer Hat","Hat"],
     "raincoat": ["Raincoat"],
     "Raincoat": ["Raincoat"],
     "rain boots": ["Rain Boots"],
@@ -64,6 +67,8 @@ STATIC_CATEGORIES = {
     "Flip Flops": ["flip flops"],
     "shirt": ["shirt"],
     "Shirt": ["shirt"],
+    "sleeveless tops": ["casual sleeveless tops"],
+    "sleeveless": ["casual sleeveless tops"],
     "casual sleeveless tops": ["casual sleeveless tops"],
     "Casual Sleeveless Tops": ["casual sleeveless tops"],
     "Sarouel Pants": ["Sarouel Pants"],
@@ -76,22 +81,27 @@ STATIC_CATEGORIES = {
 
 
     # Food
-    "food": ["Beef Rendang", "Tiyula Itum", "Pastil", "Kebab", "Escabeche", "Biko", "Puto Maya", "Binignit", "Buko Juice", "Shawarma","Satay"],
-    "foods": ["Beef Rendang", "Tiyula Itum", "Pastil", "Kebab", "Escabeche", "Biko", "Puto Maya", "Binignit", "Buko Juice", "Shawarma","Satay"],    
+    "food": ["Beef Rendang", "Tiyula Itum", "Pastil", "Kebab", "Escabeche", "Biko", "Puto Maya", "Binignit", "Buko Juice", "Shawarma","Satay","Pate",],
+    "foods": ["Beef Rendang", "Tiyula Itum", "Pastil", "Kebab", "Escabeche", "Biko", "Puto Maya", "Binignit", "Buko Juice", "Shawarma","Satay","Pate",],    
     # Halal / Muslim food
-    "halal food":   ["Beef Rendang", "Tiyula Itum", "Pastil", "Kebab","Satay"],
-    "muslim food":  ["Beef Rendang", "Tiyula Itum", "Pastil", "Kebab","Satay"],
-    "halal":        ["Beef Rendang", "Tiyula Itum", "Pastil", "Kebab","Satay"],
+    "halal food":   ["Beef Rendang", "Tiyula Itum", "Pastil", "Kebab","Satay","Pate",],
+    "muslim food":  ["Beef Rendang", "Tiyula Itum", "Pastil", "Kebab","Satay","Pate",],
+    "halal":        ["Beef Rendang", "Tiyula Itum", "Pastil", "Kebab","Satay","Pate",],
     # Seasonal Food
-    "Seasonal Food":["Beef Rendang", "Tiyula Itum", "Pastil", "Kebab","Escabeche", "Biko", "Puto Maya", "Binignit", "Buko Juice", "Shawarma","Satay"],
-    "Season Food":["Beef Rendang", "Tiyula Itum", "Pastil", "Kebab","Escabeche", "Biko", "Puto Maya", "Binignit", "Buko Juice", "Shawarma","Satay"],  
+    "Seasonal Food":["Beef Rendang", "Tiyula Itum", "Pastil", "Kebab","Escabeche", "Biko", "Puto Maya", "Binignit", "Buko Juice", "Shawarma","Satay","Pate",],
+    "Season Food":["Beef Rendang", "Tiyula Itum", "Pastil", "Kebab","Escabeche", "Biko", "Puto Maya", "Binignit", "Buko Juice", "Shawarma","Satay","Pate",],  
     # Lenten season food
     "lenten season food": ["Escabeche", "Biko", "Puto Maya", "Binignit"],
     "lenten food":        ["Escabeche", "Biko", "Puto Maya", "Binignit"],
     "lenten":             ["Escabeche", "Biko", "Puto Maya", "Binignit"],
     # School Supplies
     "school supplies": ["notebook", "pen", "pencil", "eraser", "ruler"],
-    "school supplies": ["notebook", "pen", "pencil", "eraser", "ruler"],
+    "school": ["notebook", "pen", "pencil", "eraser", "ruler"],
+    "notebook": ["notebook"],
+    "pen": ["pen"],
+    "pencil": ["pencil"],
+    "eraser": ["eraser"],
+    "ruler": ["ruler"],
 
     # drinks
     "drinks": ["Buko Juice"],
