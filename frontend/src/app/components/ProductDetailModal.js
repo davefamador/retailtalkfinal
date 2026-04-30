@@ -20,7 +20,6 @@ export default function ProductDetailModal({ product, user, onClose, onPurchased
     const [purchaseError, setPurchaseError] = useState('');
     const [cartMessage, setCartMessage] = useState({ type: '', text: '' });
     const [purchaseType, setPurchaseType] = useState('delivery');
-    const [addressModal, setAddressModal] = useState(false);
     const [contactNum, setContactNum] = useState('');
     const [deliveryAddress, setDeliveryAddress] = useState('');
     const [inWishlist, setInWishlist] = useState(false);
@@ -37,10 +36,15 @@ export default function ProductDetailModal({ product, user, onClose, onPurchased
         setCartMessage({ type: '', text: '' });
         setPurchaseType('delivery');
         setInWishlist(false);
-        // Check wishlist status
         if (user && user.role === 'buyer' && !isDemo) {
             checkWishlist(product.id)
                 .then(res => setInWishlist(res.in_wishlist))
+                .catch(() => {});
+            getMyContact()
+                .then(c => {
+                    setContactNum(c.contact_number || '');
+                    setDeliveryAddress(c.delivery_address || '');
+                })
                 .catch(() => {});
         }
     }, [product, user, isDemo]);
@@ -81,43 +85,18 @@ export default function ProductDetailModal({ product, user, onClose, onPurchased
     const handlePurchase = async () => {
         if (!user) { setPurchaseError('Please log in to purchase items.'); return; }
         if (purchaseLoading) return;
+        if (!contactNum.trim()) { setPurchaseError('Contact number is required.'); return; }
+        if (!deliveryAddress.trim()) { setPurchaseError('Delivery address is required.'); return; }
         setPurchaseError('');
         setPurchaseLoading(true);
         try {
-            await buyProduct(product.id, quantity, purchaseType);
-            setPurchased(true);
-            window.dispatchEvent(new Event('balance-updated'));
-            if (onPurchased) onPurchased(product, quantity);
-        } catch (err) {
-            const msg = err.message || '';
-            if (msg.includes('delivery address') || msg.includes('contact number')) {
-                try {
-                    const c = await getMyContact();
-                    setContactNum(c.contact_number || '');
-                    setDeliveryAddress(c.delivery_address || '');
-                } catch (_) {}
-                setAddressModal(true);
-            } else {
-                setPurchaseError(msg || 'Failed to complete purchase. Check balance or stock.');
-            }
-        } finally {
-            setPurchaseLoading(false);
-        }
-    };
-
-    const handleSaveAddressAndBuy = async () => {
-        if (!contactNum.trim()) { setPurchaseError('Contact number is required.'); return; }
-        if (purchaseType === 'delivery' && !deliveryAddress.trim()) { setPurchaseError('Delivery address is required.'); return; }
-        setPurchaseLoading(true);
-        try {
             await setMyContact(contactNum.trim(), deliveryAddress.trim());
-            setAddressModal(false);
             await buyProduct(product.id, quantity, purchaseType);
             setPurchased(true);
             window.dispatchEvent(new Event('balance-updated'));
             if (onPurchased) onPurchased(product, quantity);
         } catch (err) {
-            setPurchaseError(err.message || 'Failed to complete purchase.');
+            setPurchaseError(err.message || 'Failed to complete purchase. Check balance or stock.');
         } finally {
             setPurchaseLoading(false);
         }
@@ -135,7 +114,6 @@ export default function ProductDetailModal({ product, user, onClose, onPurchased
     };
 
     const closeAll = () => {
-        setAddressModal(false);
         setPurchased(false);
         onClose();
     };
@@ -394,6 +372,42 @@ export default function ProductDetailModal({ product, user, onClose, onPurchased
 
                                         {user && user.role === 'buyer' && (
                                             <>
+                                                {/* Inline delivery fields */}
+                                                <div style={{ marginBottom: 10 }}>
+                                                    <label style={{ display: 'block', fontSize: '0.78rem', fontWeight: 600, color: 'var(--text-secondary)', marginBottom: 4 }}>
+                                                        Contact Number
+                                                    </label>
+                                                    <input
+                                                        type="tel"
+                                                        placeholder="e.g. 09171234567"
+                                                        value={contactNum}
+                                                        onChange={e => setContactNum(e.target.value)}
+                                                        style={{
+                                                            width: '100%', padding: '8px 12px', borderRadius: 8,
+                                                            border: '1px solid var(--border-color)',
+                                                            background: 'var(--bg-secondary)', color: 'var(--text-primary)',
+                                                            fontFamily: 'Inter, sans-serif', fontSize: '0.85rem',
+                                                        }}
+                                                    />
+                                                </div>
+                                                <div style={{ marginBottom: 12 }}>
+                                                    <label style={{ display: 'block', fontSize: '0.78rem', fontWeight: 600, color: 'var(--text-secondary)', marginBottom: 4 }}>
+                                                        Delivery Address
+                                                    </label>
+                                                    <textarea
+                                                        placeholder="Enter delivery address"
+                                                        value={deliveryAddress}
+                                                        onChange={e => setDeliveryAddress(e.target.value)}
+                                                        rows={2}
+                                                        style={{
+                                                            width: '100%', padding: '8px 12px', borderRadius: 8,
+                                                            border: '1px solid var(--border-color)',
+                                                            background: 'var(--bg-secondary)', color: 'var(--text-primary)',
+                                                            fontFamily: 'Inter, sans-serif', fontSize: '0.85rem',
+                                                            resize: 'vertical',
+                                                        }}
+                                                    />
+                                                </div>
                                                 {/* Delivery info */}
                                                 <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginBottom: 10 }}>
                                                     + PHP 40.00 delivery fee per department store
@@ -452,74 +466,7 @@ export default function ProductDetailModal({ product, user, onClose, onPurchased
                 </div>
             </div>
 
-            {/* ===== DELIVERY ADDRESS MODAL ===== */}
-            {addressModal && (
-                <div
-                    onClick={() => setAddressModal(false)}
-                    style={{
-                        position: 'fixed', inset: 0, zIndex: 1100,
-                        background: 'rgba(0,0,0,0.7)',
-                        backdropFilter: 'blur(8px)', WebkitBackdropFilter: 'blur(8px)',
-                        display: 'flex', alignItems: 'center', justifyContent: 'center',
-                        padding: 24,
-                    }}
-                >
-                    <div
-                        onClick={(e) => e.stopPropagation()}
-                        style={{
-                            background: 'var(--bg-primary)', borderRadius: 20, padding: 32,
-                            width: 440, maxWidth: '90vw', border: '1px solid var(--border-color)',
-                            boxShadow: '0 20px 60px rgba(0,0,0,0.5)',
-                        }}
-                    >
-                        <h3 style={{ fontSize: '1.2rem', fontWeight: 800, marginBottom: 8 }}>📍 Delivery Address Required</h3>
-                        <p style={{ color: 'var(--text-muted)', fontSize: '0.85rem', marginBottom: 20 }}>
-                            Please provide your contact number and delivery address to place a delivery order.
-                        </p>
 
-                        {purchaseError && (
-                            <div style={{
-                                background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.3)',
-                                color: '#ef4444', padding: '10px 14px', borderRadius: 8, marginBottom: 14, fontSize: '0.85rem',
-                            }}>{purchaseError}</div>
-                        )}
-
-                        <div style={{ marginBottom: 14 }}>
-                            <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 600, color: 'var(--text-secondary)', marginBottom: 6 }}>Contact Number *</label>
-                            <input
-                                type="tel" placeholder="e.g. 09171234567"
-                                value={contactNum} onChange={(e) => setContactNum(e.target.value)}
-                                style={{
-                                    width: '100%', padding: '10px 14px', borderRadius: 10,
-                                    background: 'var(--bg-card)', border: '1px solid var(--border-color)',
-                                    color: 'var(--text-primary)', fontFamily: 'Inter, sans-serif', fontSize: '0.9rem',
-                                }}
-                            />
-                        </div>
-                        <div style={{ marginBottom: 20 }}>
-                            <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 600, color: 'var(--text-secondary)', marginBottom: 6 }}>Delivery Address *</label>
-                            <textarea
-                                placeholder="Enter your full delivery address"
-                                value={deliveryAddress} onChange={(e) => setDeliveryAddress(e.target.value)}
-                                rows={3}
-                                style={{
-                                    width: '100%', padding: '10px 14px', borderRadius: 10,
-                                    background: 'var(--bg-card)', border: '1px solid var(--border-color)',
-                                    color: 'var(--text-primary)', fontFamily: 'Inter, sans-serif', fontSize: '0.9rem',
-                                    resize: 'vertical',
-                                }}
-                            />
-                        </div>
-
-                        <div style={{ display: 'flex', gap: 12 }}>
-                            <button className="btn btn-primary" onClick={handleSaveAddressAndBuy}
-                                style={{ flex: 1, padding: '12px 0', fontSize: '0.9rem', fontWeight: 700, borderRadius: 10 }}>Save & Buy</button>
-                            <button className="btn btn-outline" onClick={() => setAddressModal(false)}
-                                style={{ flex: 1, padding: '12px 0', fontSize: '0.9rem', fontWeight: 700, borderRadius: 10 }}>Cancel</button>
-                        </div>
-                    </div>
-                </div>
-            )}
 
             {/* Inline keyframe animations */}
             <style jsx>{`
