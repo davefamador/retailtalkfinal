@@ -15,7 +15,6 @@ export default function ProductDetailPage() {
     const [error, setError] = useState('');
     const [success, setSuccess] = useState('');
     const [selectedImage, setSelectedImage] = useState(0);
-    const [addressModal, setAddressModal] = useState(false);
     const [contactNum, setContactNum] = useState('');
     const [deliveryAddr, setDeliveryAddr] = useState('');
     const [wishlisted, setWishlisted] = useState(false);
@@ -29,6 +28,10 @@ export default function ProductDetailPage() {
         loadProduct();
         if (stored && stored.role === 'buyer') {
             checkWishlist(params.id).then(r => setWishlisted(r.in_wishlist)).catch(() => {});
+            getMyContact().then(c => {
+                setContactNum(c.contact_number || '');
+                setDeliveryAddr(c.delivery_address || '');
+            }).catch(() => {});
         }
     }, []);
 
@@ -63,22 +66,27 @@ export default function ProductDetailPage() {
     };
 
     const handleBuy = async () => {
-        if (!user) {
-            window.location.href = '/login';
-            return;
-        }
-        if (user.role !== 'buyer') {
-            setError('Only buyer accounts can purchase products.');
-            return;
-        }
+        if (!user) { window.location.href = '/login'; return; }
+        if (user.role !== 'buyer') { setError('Only buyer accounts can purchase products.'); return; }
+        if (!contactNum.trim()) { setError('Contact number is required.'); return; }
+        if (!deliveryAddr.trim()) { setError('Delivery address is required.'); return; }
+        setBuying(true);
         setError('');
         setSuccess('');
         try {
-            const c = await getMyContact();
-            setContactNum(c.contact_number || '');
-            setDeliveryAddr(c.delivery_address || '');
-        } catch (_) {}
-        setAddressModal(true);
+            await setMyContact(contactNum.trim(), deliveryAddr.trim());
+            await buyProduct(product.id, quantity);
+            setSuccess(`Successfully purchased ${quantity}x ${product.title}!`);
+            window.dispatchEvent(new Event('balance-updated'));
+            removeFromCart(product.id).catch(() => {});
+            const updated = await getProduct(params.id);
+            setProduct(updated);
+            setQuantity(1);
+        } catch (err) {
+            setError(err.message || 'Failed to complete purchase.');
+        } finally {
+            setBuying(false);
+        }
     };
 
     const canEditImages = user && (user.role === 'admin' || user.role === 'manager');
@@ -125,29 +133,6 @@ export default function ProductDetailPage() {
             setError(err.message || 'Failed to remove image.');
         } finally {
             setImageUploading(false);
-        }
-    };
-
-    const handleSaveAddressAndBuy = async () => {
-        if (!contactNum.trim()) { setError('Contact number is required.'); return; }
-        if (!deliveryAddr.trim()) { setError('Delivery address is required.'); return; }
-        setBuying(true);
-        setError('');
-        try {
-            await setMyContact(contactNum.trim(), deliveryAddr.trim());
-            setAddressModal(false);
-            await buyProduct(product.id, quantity);
-            setSuccess(`Successfully purchased ${quantity}x ${product.title}!`);
-            window.dispatchEvent(new Event('balance-updated'));
-            // Remove from cart if the product was there
-            removeFromCart(product.id).catch(() => {});
-            const updated = await getProduct(params.id);
-            setProduct(updated);
-            setQuantity(1);
-        } catch (err) {
-            setError(err.message || 'Failed to complete purchase.');
-        } finally {
-            setBuying(false);
         }
     };
 
@@ -404,14 +389,51 @@ export default function ProductDetailPage() {
 
                             {user ? (
                                 user.role === 'buyer' ? (
-                                    <button
-                                        className="btn btn-success"
-                                        onClick={handleBuy}
-                                        disabled={buying}
-                                        style={{ width: '100%', padding: '14px', fontSize: '1rem' }}
-                                    >
-                                        {buying ? <><span className="spinner"></span> Processing...</> : `Buy Now — PHP ${grandTotal}`}
-                                    </button>
+                                    <>
+                                        <div style={{ marginBottom: 10 }}>
+                                            <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 600, color: 'var(--text-secondary)', marginBottom: 5 }}>
+                                                Contact Number
+                                            </label>
+                                            <input
+                                                type="tel"
+                                                placeholder="e.g. 09171234567"
+                                                value={contactNum}
+                                                onChange={e => setContactNum(e.target.value)}
+                                                style={{
+                                                    width: '100%', padding: '9px 12px', borderRadius: 8,
+                                                    border: '1px solid var(--border-color)',
+                                                    background: 'var(--bg-secondary)', color: 'var(--text-primary)',
+                                                    fontFamily: 'Inter, sans-serif', fontSize: '0.88rem',
+                                                }}
+                                            />
+                                        </div>
+                                        <div style={{ marginBottom: 14 }}>
+                                            <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 600, color: 'var(--text-secondary)', marginBottom: 5 }}>
+                                                Delivery Address
+                                            </label>
+                                            <textarea
+                                                placeholder="Enter delivery address"
+                                                value={deliveryAddr}
+                                                onChange={e => setDeliveryAddr(e.target.value)}
+                                                rows={2}
+                                                style={{
+                                                    width: '100%', padding: '9px 12px', borderRadius: 8,
+                                                    border: '1px solid var(--border-color)',
+                                                    background: 'var(--bg-secondary)', color: 'var(--text-primary)',
+                                                    fontFamily: 'Inter, sans-serif', fontSize: '0.88rem',
+                                                    resize: 'vertical',
+                                                }}
+                                            />
+                                        </div>
+                                        <button
+                                            className="btn btn-success"
+                                            onClick={handleBuy}
+                                            disabled={buying}
+                                            style={{ width: '100%', padding: '14px', fontSize: '1rem' }}
+                                        >
+                                            {buying ? <><span className="spinner"></span> Processing...</> : `Buy Now — PHP ${grandTotal}`}
+                                        </button>
+                                    </>
                                 ) : (
                                     <p style={{ textAlign: 'center', color: 'var(--text-muted)', fontSize: '0.9rem' }}>
                                         {user.role === 'staff' ? 'Staff cannot purchase products. Switch to a buyer account.' : ''}
@@ -427,77 +449,6 @@ export default function ProductDetailPage() {
                 </div>
             </div>
 
-        {/* ===== DELIVERY ADDRESS MODAL ===== */}
-        {addressModal && (
-            <div
-                onClick={() => setAddressModal(false)}
-                style={{
-                    position: 'fixed', inset: 0, zIndex: 1100,
-                    background: 'rgba(0,0,0,0.7)',
-                    backdropFilter: 'blur(8px)', WebkitBackdropFilter: 'blur(8px)',
-                    display: 'flex', alignItems: 'center', justifyContent: 'center',
-                    padding: 24,
-                }}
-            >
-                <div
-                    onClick={(e) => e.stopPropagation()}
-                    style={{
-                        background: 'var(--bg-primary)', borderRadius: 20, padding: 32,
-                        width: 440, maxWidth: '90vw', border: '1px solid var(--border-color)',
-                        boxShadow: '0 20px 60px rgba(0,0,0,0.5)',
-                    }}
-                >
-                    <h3 style={{ fontSize: '1.2rem', fontWeight: 800, marginBottom: 8 }}>📍 Confirm Delivery Details</h3>
-                    <p style={{ color: 'var(--text-muted)', fontSize: '0.85rem', marginBottom: 20 }}>
-                        Review or update your delivery address. You can ship to a different location if needed.
-                    </p>
-
-                    {error && (
-                        <div style={{
-                            background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.3)',
-                            color: '#ef4444', padding: '10px 14px', borderRadius: 8, marginBottom: 14, fontSize: '0.85rem',
-                        }}>{error}</div>
-                    )}
-
-                    <div style={{ marginBottom: 14 }}>
-                        <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 600, color: 'var(--text-secondary)', marginBottom: 6 }}>Contact Number *</label>
-                        <input
-                            type="tel" placeholder="e.g. 09171234567"
-                            value={contactNum} onChange={(e) => setContactNum(e.target.value)}
-                            style={{
-                                width: '100%', padding: '10px 14px', borderRadius: 10,
-                                background: 'var(--bg-card)', border: '1px solid var(--border-color)',
-                                color: 'var(--text-primary)', fontFamily: 'Inter, sans-serif', fontSize: '0.9rem',
-                            }}
-                        />
-                    </div>
-                    <div style={{ marginBottom: 20 }}>
-                        <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 600, color: 'var(--text-secondary)', marginBottom: 6 }}>Delivery Address *</label>
-                        <textarea
-                            placeholder="Enter your full delivery address"
-                            value={deliveryAddr} onChange={(e) => setDeliveryAddr(e.target.value)}
-                            rows={3}
-                            style={{
-                                width: '100%', padding: '10px 14px', borderRadius: 10,
-                                background: 'var(--bg-card)', border: '1px solid var(--border-color)',
-                                color: 'var(--text-primary)', fontFamily: 'Inter, sans-serif', fontSize: '0.9rem',
-                                resize: 'vertical',
-                            }}
-                        />
-                    </div>
-
-                    <div style={{ display: 'flex', gap: 12 }}>
-                        <button className="btn btn-primary" onClick={handleSaveAddressAndBuy}
-                            disabled={buying}
-                            style={{ flex: 1, padding: '12px 0', fontSize: '0.9rem', fontWeight: 700, borderRadius: 10 }}>
-                            {buying ? 'Processing...' : 'Save & Buy'}
-                        </button>
-                        <button className="btn btn-outline" onClick={() => setAddressModal(false)}
-                            style={{ flex: 1, padding: '12px 0', fontSize: '0.9rem', fontWeight: 700, borderRadius: 10 }}>Cancel</button>
-                    </div>
-                </div>
-            </div>
-        )}
     </div>
     );
 }
