@@ -161,7 +161,7 @@ async def buy_product(req: BuyRequest, current_user: dict = Depends(get_current_
     seller_dept_id = seller_info.data[0].get("department_id") if seller_info.data else None
 
     existing_group_id = None
-    delivery_fee = 90.00  # Default: new group
+    delivery_fee = 40.00  # Default: new group
 
     # Look for an active group for this buyer within the same store/department in the last hour.
     # An open group has NO transaction in ondeliver/delivered/undelivered/cancelled state.
@@ -538,7 +538,7 @@ async def get_staff_delivery_orders(current_user: dict = Depends(get_current_use
                 "assigned_staff_id": t.get("assigned_staff_id"),
                 "assigned_staff_name": user_names.get(t.get("assigned_staff_id", ""), ""),
                 "created_at": t["created_at"],
-                "delivery_fee": 90.0,  # flat per group
+                "delivery_fee": 40.0,  # flat per group
                 "items": [],
                 "total_amount": 0.0,
             }
@@ -687,7 +687,7 @@ async def get_manager_delivery_orders(current_user: dict = Depends(get_current_u
                 "assigned_staff_id": t.get("assigned_staff_id"),
                 "assigned_staff_name": user_names.get(t.get("assigned_staff_id", ""), ""),
                 "created_at": t["created_at"],
-                "delivery_fee": 90.0,
+                "delivery_fee": 40.0,
                 "items": [],
                 "total_amount": 0.0,
             }

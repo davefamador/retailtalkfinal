@@ -1,6 +1,6 @@
 """
 Cart routes — shopping cart for buyers.
-One flat ₱90 delivery fee per unique department/store (per group).
+One flat ₱40 delivery fee per unique department/store (per group).
 Checkout creates one transaction per cart item, grouped by group_id per department.
 """
 
@@ -13,7 +13,7 @@ from routes.auth import get_current_user
 
 router = APIRouter(prefix="/cart", tags=["Cart"])
 
-DELIVERY_FEE_PER_DEPARTMENT = 90.00
+DELIVERY_FEE_PER_DEPARTMENT = 40.00
 
 
 class AddToCartRequest(BaseModel):
