@@ -25,7 +25,9 @@ STATIC_CATEGORIES = {
     "halal food":   ["Beef Rendang", "Tiyula Itum", "Pastil", "Kebab","Satay"],
     "muslim food":  ["Beef Rendang", "Tiyula Itum", "Pastil", "Kebab","Satay"],
     "halal":        ["Beef Rendang", "Tiyula Itum", "Pastil", "Kebab","Satay"],
-
+    # Seasonal Food
+    "Seasonal Food":["Beef Rendang", "Tiyula Itum", "Pastil", "Kebab","Escabeche", "Biko", "Puto Maya", "Binignit", "Buko Juice", "Shawarma","Satay"],
+    "Season Food":["Beef Rendang", "Tiyula Itum", "Pastil", "Kebab","Escabeche", "Biko", "Puto Maya", "Binignit", "Buko Juice", "Shawarma","Satay"],  
     # Lenten season food
     "lenten season food": ["Escabeche", "Biko", "Puto Maya", "Binignit"],
     "lenten food":        ["Escabeche", "Biko", "Puto Maya", "Binignit"],
@@ -67,6 +69,7 @@ SUMMER_FOOD_TITLES = [
     "Gardenia Classic White Bread", "Kebab","Satay",
     "Pastil", "Puto Maya", "Shawarma", "Tiyula Itum",
 ]
+
 
 SUMMER_KEYWORDS = {"summer food", "summer foods"}
 
