@@ -18,6 +18,64 @@ Supports:
 
 # Category keyword (lowercased) -> list of exact product titles in the database
 STATIC_CATEGORIES = {
+
+    "Beef":["Beef Rendang"],
+    "BeefRendang":["Beef Rendang"],
+    "Tiyula Itum":["Tiyula Itum"],
+    "TiyulaItum":["Tiyula Itum"],
+    "Pastil":["Pastil"],
+    "Kebab":["Kebab"],
+    "Shawarma":["Shawarma"],
+    "Satay":["Satay"],
+    "Escabeche":["Escabeche"],
+    "Biko":["Biko"],
+    "Puto Maya":["Puto Maya"],
+    "Binignit":["Binignit"],
+    "Buko Juice":["Buko Juice"],
+    
+    "canned goods": ["Sardines","Luncheon Meat", "Pate", "Meat Loaf", "Corned Beef"],
+    "canned good": ["Sardines", "Luncheon Meat", "Pate", "Meat Loaf", "Corned Beef"],
+    "canned products": ["Sardines", "Luncheon Meat", "Pate", "Meat Loaf", "Corned Beef"],
+    "canned product": ["Sardines", "Luncheon Meat", "Pate", "Meat Loaf", "Corned Beef"],
+    "canned food": ["Sardines", "Luncheon Meat", "Pate", "Meat Loaf", "Corned Beef"],
+    "canned": ["Sardines", "Luncheon Meat", "Pate", "Meat Loaf", "Corned Beef"],
+
+    "Sardines":["Sardines"],
+    "Sardine":["Sardines"],
+
+    "Fudgee Barr":["Fudgee Barr"],
+    "FudgeeBarr":["Fudgee Barr"],
+    "Marty's Cracklin":["Marty's Cracklin"],
+    "Martys Cracklin":["Marty's Cracklin"],
+    "Marty's Cracklin":["Marty's Cracklin"],
+    "Fudgee Barr":["Fudgee Barr"],
+    
+    "Bread":["Gardenia Classic White Bread"],
+    "White Bread":["Gardenia Classic White Bread"],
+    
+    "raincoat": ["Raincoat"],
+    "Raincoat": ["Raincoat"],
+    "rain boots": ["Rain Boots"],
+    "Rain Boots": ["Rain Boots"],
+    "waterproof jacket": ["Waterproof Jacket"],
+    "Waterproof Jacket": ["Waterproof Jacket"],
+    "shorts": ["shorts"],
+    "Shorts": ["shorts"],
+    "flip flops": ["flip flops"],
+    "Flip Flops": ["flip flops"],
+    "shirt": ["shirt"],
+    "Shirt": ["shirt"],
+    "casual sleeveless tops": ["casual sleeveless tops"],
+    "Casual Sleeveless Tops": ["casual sleeveless tops"],
+    "Sarouel Pants": ["Sarouel Pants"],
+    "SarouelPants": ["Sarouel Pants"],
+    "Jacket": ["Jacket"],
+    "Keffiyeh": ["Keffiyeh"],
+    "Long Sleeve": ["Long Sleeve"],
+    "Summer Hat": ["Summer Hat"],
+    "Hat": ["Hat"],
+
+
     # Food
     "food": ["Beef Rendang", "Tiyula Itum", "Pastil", "Kebab", "Escabeche", "Biko", "Puto Maya", "Binignit", "Buko Juice", "Shawarma","Satay"],
     "foods": ["Beef Rendang", "Tiyula Itum", "Pastil", "Kebab", "Escabeche", "Biko", "Puto Maya", "Binignit", "Buko Juice", "Shawarma","Satay"],    
@@ -32,6 +90,17 @@ STATIC_CATEGORIES = {
     "lenten season food": ["Escabeche", "Biko", "Puto Maya", "Binignit"],
     "lenten food":        ["Escabeche", "Biko", "Puto Maya", "Binignit"],
     "lenten":             ["Escabeche", "Biko", "Puto Maya", "Binignit"],
+    # School Supplies
+    "school supplies": ["notebook", "pen", "pencil", "eraser", "ruler"],
+    "school supplies": ["notebook", "pen", "pencil", "eraser", "ruler"],
+
+    # drinks
+    "drinks": ["Buko Juice"],
+    "drink": ["Buko Juice"],
+    
+    #Toys
+    "toys": ["Lego"],
+    "toy": ["Lego"],
 
     # Snacks
     "snacks": ["Marty's Cracklin", "Fudgee Barr", "Nagaraya", "Boy Bawang", "Oishi Prawn Crackers", "Skyflakes"],
