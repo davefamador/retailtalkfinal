@@ -161,12 +161,14 @@ def _fetch_static_products(titles: list[str], filters: dict) -> list[SearchResul
     import hashlib
 
     sb = get_supabase()
+    # Use ilike OR filter so titles match regardless of case (e.g. "skyflakes" == "Skyflakes")
+    ilike_filter = ",".join(f"title.ilike.%{t}%" for t in titles)
     qb = (sb.table("products")
           .select("*")
           .eq("is_active", True)
           .eq("status", "approved")
           .gt("stock", 0)
-          .in_("title", titles))
+          .or_(ilike_filter))
 
     if filters.get("price_max") is not None:
         qb = qb.lte("price", filters["price_max"])
@@ -230,6 +232,7 @@ def _try_static_search(rewritten, max_results: int):
             return None
 
         all_results = []
+        static_category_matched = False
 
         for i, group in enumerate(rewritten.search_groups):
             titles = match_static_category(group.search_text)
@@ -237,14 +240,17 @@ def _try_static_search(rewritten, max_results: int):
                 # At least one group doesn't match — fall through to ML pipeline
                 print(f"[Search] Static check: group {i+1} '{group.search_text}' → no match — falling through")
                 return None
+            static_category_matched = True
             print(f"[Search] Static check: group {i+1} '{group.search_text}' → matched {len(titles)} titles")
             group_results = _fetch_static_products(titles, group.filters)
+            print(f"[Search] Static check: group {i+1} → {len(group_results)} products found in DB (out of {len(titles)} in static list)")
             all_results.extend(group_results)
 
-        # No products matched any static category — fall through
-        if not all_results:
-            print(f"[Search] Static check: categories matched but 0 products found in DB — falling through")
-            return None
+        # If the query matched a static category, always return static results (even if empty).
+        # This hides products not yet in the database instead of leaking ML pipeline results.
+        if static_category_matched and not all_results:
+            print(f"[Search] Static check: category matched but 0 products in DB — returning empty (not falling through to ML)")
+            return []
 
         # Deduplicate by product id (keep first occurrence)
         seen = {}
@@ -417,13 +423,15 @@ async def search_products(
         # Check if search groups match hardcoded product categories
         # (e.g., halal food, lenten food, snacks, summer food)
         static_results = _try_static_search(rewritten, max_results)
-        if static_results is not None and len(static_results) > 0:
+        if static_results is not None:
+            # static_results is a list (possibly empty) — always return it without hitting ML.
+            # Empty means the category is recognised but no matching products exist in the DB yet.
             print(f"[Search] ✓ Static match — returning {len(static_results)} products (skipping ML pipeline)")
             return SearchResponse(
                 query=q,
                 total_results=len(static_results),
                 results=static_results,
-                message="",
+                message="" if static_results else "No products found matching your query.",
                 rewritten_query=rewritten.search_text,
                 detected_intents=rewritten.intents,
                 extracted_slots=rewritten.slots,

@@ -18,10 +18,13 @@ Supports:
 
 # Category keyword (lowercased) -> list of exact product titles in the database
 STATIC_CATEGORIES = {
+    # Food
+    "food": ["Beef Rendang", "Tiyula Itum", "Pastil", "Kebab", "Escabeche", "Biko", "Puto Maya", "Binignit", "Buko Juice", "Shawarma","Satay"],
+    "foods": ["Beef Rendang", "Tiyula Itum", "Pastil", "Kebab", "Escabeche", "Biko", "Puto Maya", "Binignit", "Buko Juice", "Shawarma","Satay"],    
     # Halal / Muslim food
-    "halal food":   ["Beef Rendang", "Tiyula Itum", "Pastil", "Kebab"],
-    "muslim food":  ["Beef Rendang", "Tiyula Itum", "Pastil", "Kebab"],
-    "halal":        ["Beef Rendang", "Tiyula Itum", "Pastil", "Kebab"],
+    "halal food":   ["Beef Rendang", "Tiyula Itum", "Pastil", "Kebab","Satay"],
+    "muslim food":  ["Beef Rendang", "Tiyula Itum", "Pastil", "Kebab","Satay"],
+    "halal":        ["Beef Rendang", "Tiyula Itum", "Pastil", "Kebab","Satay"],
 
     # Lenten season food
     "lenten season food": ["Escabeche", "Biko", "Puto Maya", "Binignit"],
@@ -29,14 +32,39 @@ STATIC_CATEGORIES = {
     "lenten":             ["Escabeche", "Biko", "Puto Maya", "Binignit"],
 
     # Snacks
-    "snacks": ["Marty's Cracklin", "Fudgee Barr", "Nagaraya", "Boy Bawang", "Oishi Prawn Crackers"],
-    "snack":  ["Marty's Cracklin", "Fudgee Barr", "Nagaraya", "Boy Bawang", "Oishi Prawn Crackers"],
+    "snacks": ["Marty's Cracklin", "Fudgee Barr", "Nagaraya", "Boy Bawang", "Oishi Prawn Crackers", "Skyflakes"],
+    "snack":  ["Marty's Cracklin", "Fudgee Barr", "Nagaraya", "Boy Bawang", "Oishi Prawn Crackers", "Skyflakes"],
+
+    # Seasonal Clothes
+    "season clothes": ["Raincoat", "Rain Boots", "Waterproof Jacket", "shorts", "flip flops", "shirt", "casual sleeveless tops", "Sarouel Pants","Jacket","Keffiyeh","Long Sleeve","Summer Hat","Hat"],
+    "seasonal clothes": ["Raincoat", "Rain Boots", "Waterproof Jacket", "shorts", "flip flops", "shirt", "casual sleeveless tops", "Sarouel Pants","Jacket","Keffiyeh","Long Sleeve","Summer Hat","Hat"],
+    "weather clothes": ["Raincoat", "Rain Boots", "Waterproof Jacket", "shorts", "flip flops", "shirt", "casual sleeveless tops", "Sarouel Pants"],
+    "clothes for the season": ["Raincoat", "Rain Boots", "Waterproof Jacket", "shorts", "flip flops", "shirt", "casual sleeveless tops", "Sarouel Pants"],
+
+    # Wet Season clothes
+    "wet season clothes": ["Raincoat", "Rain Boots", "Waterproof Jacket"],
+    "wet clothes": ["Raincoat", "Rain Boots", "Waterproof Jacket"],
+    "wet season": ["Raincoat", "Rain Boots", "Waterproof Jacket"],
+    "rainy season clothes": ["Raincoat", "Rain Boots", "Waterproof Jacket"],
+    "rainy clothes": ["Raincoat", "Rain Boots", "Waterproof Jacket"],
+    "rainy season": ["Raincoat", "Rain Boots", "Waterproof Jacket"],
+
+    # Dry Season clothes
+    "dry season clothes": ["shorts", "flip flops", "shirt"],
+    "dry clothes": ["shorts", "flip flops", "shirt"],
+    "dry season": ["shorts", "flip flops", "shirt"],
+    "hot season clothes": ["shorts", "flip flops", "shirt"],
+    "hot season": ["shorts", "flip flops", "shirt"],
+
+    # Summer Clothes
+    "summer clothes": ["shorts", "flip flops", "shirt", "Sarouel Pants","Jacket","Keffiyeh","Long Sleeve","Summer Hat", "Hat"],
+    "summer": ["shorts", "flip flops", "shirt", "Sarouel Pants","Jacket","Keffiyeh","Long Sleeve","Summer Hat","Hat"]
 }
 
 # Summer food = all food products EXCLUDING sardines, luncheon meat, and snacks
 SUMMER_FOOD_TITLES = [
     "Beef Rendang", "Biko", "Binignit", "Buko Juice", "Escabeche",
-    "Gardenia Classic White Bread", "Kebab", "Lucky Me! Instant Mami Seafood",
+    "Gardenia Classic White Bread", "Kebab","Satay",
     "Pastil", "Puto Maya", "Shawarma", "Tiyula Itum",
 ]
 
