@@ -173,27 +173,22 @@ def _build_extracted_slots(rewritten) -> dict:
 
 def _build_applied_filters(search_groups) -> dict:
     """
-    Build a display-friendly applied_filters dict for the API response.
-    Always includes at least a 'category' entry so the frontend never
-    shows 'None' for a real search.
+    Build the applied_filters dict for the API response.
 
-    - Single group, has filters  → {category, price_max, ...}
-    - Single group, no filters   → {category}
-    - Multi-group                → {product1.category, product1.price_max, ...}
+    - Single group  → return its filters directly  {price_max: 30, ...}
+    - Multi-group   → prefix each filter with the product name so filters
+                      from different products don't overwrite each other:
+                      {food.price_max: 20, sardine.price_min: 25, ...}
     """
     if not search_groups:
         return {}
 
     if len(search_groups) == 1:
-        g = search_groups[0]
-        result = {"category": g.search_text}
-        result.update(g.filters)
-        return result
+        return dict(search_groups[0].filters)
 
     merged = {}
     for g in search_groups:
         label = g.search_text.replace(" ", "_")
-        merged[f"{label}.category"] = g.search_text
         for k, v in g.filters.items():
             merged[f"{label}.{k}"] = v
     return merged
