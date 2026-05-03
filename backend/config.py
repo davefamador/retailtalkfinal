@@ -26,12 +26,13 @@ JWT_SECRET = os.getenv("JWT_SECRET", "change-this-in-production")
 JWT_ALGORITHM = "HS256"
 JWT_EXPIRATION_HOURS = 24
 
-# ML Models — all paths relative to /app/backend inside the container
+# ML Models — defaults point to backend/trained_model for local dev.
+# On HF Spaces / Vercel, override via env vars to point at ../aimodels/.
 BERT_MODEL_NAME = os.getenv("BERT_MODEL_NAME", "bert-base-multilingual-uncased")
-CLASSIFIER_MODEL_PATH = os.getenv("CLASSIFIER_MODEL_PATH", "../aimodels/pytorch_model.bin")
-RANKER_MODEL_PATH = os.getenv("RANKER_MODEL_PATH", "../aimodels/model.safetensors")
-INTENT_MODEL_PATH = os.getenv("INTENT_MODEL_PATH", "../aimodels/intent_classifier")
-SLOT_MODEL_PATH = os.getenv("SLOT_MODEL_PATH", "../aimodels/slot_extractor")
+CLASSIFIER_MODEL_PATH = os.getenv("CLASSIFIER_MODEL_PATH", "trained_model/pytorch_model.bin")
+RANKER_MODEL_PATH = os.getenv("RANKER_MODEL_PATH", "trained_model/ranker")
+INTENT_MODEL_PATH = os.getenv("INTENT_MODEL_PATH", "trained_model/intent_classifier")
+SLOT_MODEL_PATH = os.getenv("SLOT_MODEL_PATH", "trained_model/slot_extractor")
 
 BERT_MAX_LENGTH = 256
 BERT_EMBEDDING_DIM = 768
