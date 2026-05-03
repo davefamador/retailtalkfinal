@@ -152,6 +152,45 @@ def _label_to_priority_weight(label: str) -> float:
     return (3 - priority) / 3
 
 
+def _build_extracted_slots(rewritten) -> dict:
+    """
+    Return extracted_slots for display. For multi-group queries where the NER
+    model didn't fire (slots dict is empty), synthesise slot entries from the
+    per-group filters so the frontend always shows something meaningful.
+    """
+    if rewritten.slots:
+        return rewritten.slots
+    # Synthesise from search_groups filters
+    synthesised = {}
+    for g in rewritten.search_groups:
+        label = g.search_text.replace(" ", "_")
+        prefix = f"{label}." if len(rewritten.search_groups) > 1 else ""
+        for k, v in g.filters.items():
+            slot_key = (prefix + k).upper().replace(".", "_")
+            synthesised[slot_key] = str(v)
+    return synthesised
+
+
+def _build_applied_filters(search_groups) -> dict:
+    """
+    Build a display-friendly applied_filters dict for the API response.
+    - Single group  → return its filters directly (existing behaviour).
+    - Multi-group   → flatten all per-group filters with group prefixes so
+                      the frontend can show e.g. "food.price_max: 20",
+                      "sardine.price_min: 25" instead of an empty dict.
+    """
+    if not search_groups:
+        return {}
+    if len(search_groups) == 1:
+        return search_groups[0].filters
+    merged = {}
+    for g in search_groups:
+        label = g.search_text.replace(" ", "_")
+        for k, v in g.filters.items():
+            merged[f"{label}.{k}"] = v
+    return merged
+
+
 def _fetch_static_products(titles: list[str], filters: dict) -> list[SearchResultItem]:
     """
     Fetch products by exact title from the database for static category matches.
@@ -434,8 +473,8 @@ async def search_products(
                 message="" if static_results else "No products found matching your query.",
                 rewritten_query=rewritten.search_text,
                 detected_intents=rewritten.intents,
-                extracted_slots=rewritten.slots,
-                applied_filters=rewritten.search_groups[0].filters if len(rewritten.search_groups) == 1 else {},
+                extracted_slots=_build_extracted_slots(rewritten),
+                applied_filters=_build_applied_filters(rewritten.search_groups),
                 search_groups=[{"search_text": g.search_text, "filters": g.filters} for g in rewritten.search_groups],
             )
         else:
@@ -485,8 +524,8 @@ async def search_products(
             message="" if final_results else "No products found matching your query.",
             rewritten_query=rewritten.search_text,
             detected_intents=rewritten.intents,
-            extracted_slots=rewritten.slots,
-            applied_filters=rewritten.search_groups[0].filters if len(rewritten.search_groups) == 1 else {},
+            extracted_slots=_build_extracted_slots(rewritten),
+            applied_filters=_build_applied_filters(rewritten.search_groups),
             search_groups=[{"search_text": g.search_text, "filters": g.filters} for g in rewritten.search_groups],
         )
 
@@ -546,8 +585,8 @@ async def _fallback_text_search(
         message="" if results else "No products found.",
         rewritten_query=rewritten.search_text,
         detected_intents=rewritten.intents,
-        extracted_slots=rewritten.slots,
-        applied_filters=rewritten.search_groups[0].filters if len(rewritten.search_groups) == 1 else {},
+        extracted_slots=_build_extracted_slots(rewritten),
+        applied_filters=_build_applied_filters(rewritten.search_groups),
         search_groups=[{"search_text": g.search_text, "filters": g.filters} for g in rewritten.search_groups],
     )
 
