@@ -683,7 +683,6 @@ export default function ManagerDashboard() {
         { id: 'products', icon: Tag, label: 'Products' },
         { id: 'transactions', icon: CreditCard, label: 'Order History' },
         { id: 'wishlist', icon: Heart, label: 'Wishlist' },
-        { id: 'salary', icon: DollarSign, label: 'Salary' },
         { id: 'divider' },
         { id: 'reports', icon: TrendingUp, label: 'Reports' },
     ];

@@ -344,7 +344,6 @@ export default function SellPage() {
                     <div style={{ height: 1, background: 'var(--border-color)', margin: '8px 0' }} />
                     <SidebarItem icon={ClipboardList} label="Order History" active={activeSection === 'orderhistory'} onClick={() => { setActiveSection('orderhistory'); loadDashboardData(); }} />
                     <SidebarItem icon={Heart} label="Wishlist Analytics" active={activeSection === 'wishlist'} onClick={() => { setActiveSection('wishlist'); loadWishlistReport(); }} />
-                    <SidebarItem icon={DollarSign} label="Salary" active={activeSection === 'salary'} onClick={() => { setActiveSection('salary'); loadSalaryInfo(); loadDashboardData(); }} />
                 </nav>
 
                 <div style={{

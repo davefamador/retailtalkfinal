@@ -49,6 +49,8 @@ MODIFIER_WORDS = {
     "the", "a", "an", "of", "with", "in", "na", "ng", "ang", "yung",
     "paano", "saan", "ano", "may", "gusto", "ko", "hanap",
     "magkano", "pesos", "peso", "php",
+    "priced", "costing", "costs", "worth", "price", "cost",
+    "ranging", "range", "to",
 }
 
 
@@ -62,6 +64,42 @@ COMPOUND_CONJUNCTIONS = [
 ]
 
 
+_BETWEEN_RE = re.compile(
+    r'\b(between|sa pagitan ng|nasa pagitan ng)\s+(\d+(?:\.\d+)?)\s+'
+    r'(?:pesos?\s+)?(?:and|to|hanggang|at)\s+(\d+(?:\.\d+)?)',
+    re.IGNORECASE,
+)
+
+# Bare "X to Y" range without the word "between": "snacks 20 to 50"
+_BARE_RANGE_RE = re.compile(
+    r'(?<!\d)(\d+(?:\.\d+)?)\s+(?:pesos?\s+)?to\s+(\d+(?:\.\d+)?)(?!\d)',
+    re.IGNORECASE,
+)
+
+
+def extract_between_range(query: str) -> Optional[tuple[float, float]]:
+    """
+    Detect price range patterns. Checks in order:
+    1. 'between X and Y' / 'between X to Y'
+    2. Bare 'X to Y' (e.g. 'snacks 20 to 50')
+    Returns (min, max) or None if no range found.
+    """
+    m = _BETWEEN_RE.search(query)
+    if m:
+        a, b = float(m.group(2)), float(m.group(3))
+        return (min(a, b), max(a, b))
+    m = _BARE_RANGE_RE.search(query)
+    if m:
+        a, b = float(m.group(1)), float(m.group(2))
+        return (min(a, b), max(a, b))
+    return None
+
+
+def _strip_between_clause(query: str) -> str:
+    """Remove a 'between X and Y' clause from the query string."""
+    return _BETWEEN_RE.sub("", query).strip()
+
+
 def split_compound_query(query: str) -> list[str]:
     """
     Split a compound query on conjunctions ('and', 'at saka', etc.)
@@ -72,7 +110,46 @@ def split_compound_query(query: str) -> list[str]:
 
     "peanut butter and jelly under 200"
     -> ["peanut butter", "jelly under 200"]
+
+    "snacks between 20 and 50" — NOT split (between-range guard)
+    -> ["snacks between 20 and 50"]
+
+    "snacks between 20 and 50 and halal food between 100 and 200"
+    -> ["snacks between 20 and 50", "halal food between 100 and 200"]
     """
+    between_matches = list(_BETWEEN_RE.finditer(query))
+    if between_matches:
+        # Replace each between-clause with a placeholder so the "and" inside
+        # the range doesn't get treated as a product conjunction.
+        placeholder_map = {}
+        working = query
+        for i, m in enumerate(reversed(between_matches)):
+            placeholder = f"__BETWEEN{i}__"
+            placeholder_map[placeholder] = m.group(0)
+            working = working[: m.start()] + placeholder + working[m.end() :]
+
+        # Now split the placeholder-substituted string on conjunctions
+        split_parts = [working]
+        for conj in COMPOUND_CONJUNCTIONS:
+            new_parts = []
+            for part in split_parts:
+                new_parts.extend(re.split(conj, part, flags=re.IGNORECASE))
+            split_parts = new_parts
+
+        cleaned = [p.strip() for p in split_parts if p and p.strip()]
+
+        if len(cleaned) < 2:
+            # No product-level split found — return original query unchanged
+            return [query]
+
+        # Restore placeholders in each part
+        restored = []
+        for part in cleaned:
+            for ph, original_clause in placeholder_map.items():
+                part = part.replace(ph, original_clause)
+            restored.append(part.strip())
+        return [r for r in restored if r]
+
     for conj in COMPOUND_CONJUNCTIONS:
         parts = re.split(conj, query, flags=re.IGNORECASE)
         if len(parts) >= 2:
@@ -82,12 +159,74 @@ def split_compound_query(query: str) -> list[str]:
     return [query]
 
 
+def _split_space_separated_products(part: str) -> list[str]:
+    """
+    Handle queries like "food toys drinks snacks under 50" where products are
+    listed with spaces but no conjunctions or commas.
+
+    Strategy: strip price-modifier tail, then greedily match the longest
+    static-category token sequence from left to right. If 2+ distinct
+    products are found, re-attach the price tail to each.
+
+    Returns the original part unchanged (as a one-element list) when fewer
+    than 2 products are identified — preserving all existing behaviour.
+    """
+    # Lazy import to avoid circular dependency
+    from models.static_search import _STATIC_CATEGORIES_LOWER
+
+    # Separate the price-modifier tail from the product tokens.
+    # Price tail starts at the first modifier word or digit.
+    price_tail_re = re.compile(
+        r'\s+(?:under|below|less|above|over|more|at|between|cheaper|budget'
+        r'|affordable|cheap|pricey|priced|costing|worth|\d).*$',
+        re.IGNORECASE,
+    )
+    tail_match = price_tail_re.search(part)
+    if tail_match:
+        product_segment = part[:tail_match.start()].strip()
+        price_tail = part[tail_match.start():].strip()
+    else:
+        product_segment = part.strip()
+        price_tail = ""
+
+    if not product_segment:
+        return [part]
+
+    # Greedy left-to-right match of longest static-category tokens
+    words = product_segment.split()
+    products = []
+    i = 0
+    while i < len(words):
+        matched = None
+        # Try longest span first (up to remaining words)
+        for span in range(len(words) - i, 0, -1):
+            candidate = " ".join(words[i:i + span]).lower()
+            if candidate in _STATIC_CATEGORIES_LOWER:
+                matched = " ".join(words[i:i + span])
+                i += span
+                break
+        if matched:
+            products.append(matched)
+        else:
+            # Unrecognised word — abort, return original part unchanged
+            return [part]
+
+    if len(products) < 2:
+        return [part]
+
+    # Re-attach the price tail to each product
+    if price_tail:
+        return [f"{p} {price_tail}" for p in products]
+    return products
+
+
 def split_sentences(query: str) -> list[str]:
     """
     Split a multi-sentence or compound query into individual sub-queries.
     1. Splits on . ? ! followed by whitespace (standard sentence splitting).
     2. Splits on commas that act as product separators.
     3. Then splits each sentence on conjunctions ('and', 'at saka').
+    4. Then splits space-separated product lists with no conjunctions.
     """
     # Split on sentence-ending punctuation: . followed by space+letter (avoids
     # decimals like "3.5"), or ? / ! at end/followed by whitespace.
@@ -104,10 +243,14 @@ def split_sentences(query: str) -> list[str]:
         comma_parts.extend(csv if len(csv) >= 2 else [sent])
 
     # Compound query splitting on each part (handles 'and')
-    all_parts = []
+    conj_parts = []
     for part in comma_parts:
-        compound_parts = split_compound_query(part)
-        all_parts.extend(compound_parts)
+        conj_parts.extend(split_compound_query(part))
+
+    # Space-separated product list splitting (no conjunctions/commas needed)
+    all_parts = []
+    for part in conj_parts:
+        all_parts.extend(_split_space_separated_products(part))
 
     return all_parts if all_parts else [query.strip()]
 
@@ -143,27 +286,72 @@ def _merge_rewritten_queries(
             seen_groups[key] = g
     all_groups = list(seen_groups.values())
 
-    # ── Propagate shared price filter to all groups ───────────────────────────
+    # ── Propagate shared price filter to groups that have no price of their own ─
     # When the user writes "food and toys less than 20", splitting produces one
     # group with price_max=20 and another with none.  Since only a single unique
     # price value appears across all groups, treat it as a global constraint and
-    # apply it to every group.
-    # (If each group already has its OWN distinct value — e.g.
-    #  "shoes under 300 and bags under 500" — we leave them independent.)
+    # fill it into groups that are missing it.
+    #
+    # Crucially: only propagate when the candidate value is a standalone
+    # directional price (i.e. the source group does NOT also have the paired
+    # bound).  A between-range group carries BOTH price_min AND price_max
+    # together — those are tied to that product and must not bleed to others.
+    # Example: "sardine under 30 and halal food between 50 and 80"
+    #   → sardine: {price_max:30}   halal: {price_min:50, price_max:80}
+    #   → price_min=50 must NOT be stamped onto sardine (would make 50≤p≤30 impossible)
     price_maxes = {g.filters["price_max"] for g in all_groups if "price_max" in g.filters}
     price_mins  = {g.filters["price_min"] for g in all_groups if "price_min" in g.filters}
 
     if len(price_maxes) == 1:
         shared_max = next(iter(price_maxes))
-        for g in all_groups:
-            g.filters["price_max"] = shared_max
-        print(f"[QueryRewriter] Shared price_max={shared_max} applied to all {len(all_groups)} groups")
+        # Only propagate if the source is a standalone max (no paired min) AND
+        # only into target groups that have NO price constraint at all.
+        # Prevents bleeding into groups that already have their own price_min
+        # (e.g. "sardines under 30 and drinks above 50" — drinks must not also
+        # get price_max=30, which would create an impossible range).
+        source_is_standalone = any(
+            g.filters.get("price_max") == shared_max and "price_min" not in g.filters
+            for g in all_groups
+        )
+        if source_is_standalone:
+            for g in all_groups:
+                if "price_max" not in g.filters and "price_min" not in g.filters:
+                    g.filters["price_max"] = shared_max
+            print(f"[QueryRewriter] Shared price_max={shared_max} applied to groups with no price")
 
     if len(price_mins) == 1:
         shared_min = next(iter(price_mins))
-        for g in all_groups:
-            g.filters["price_min"] = shared_min
-        print(f"[QueryRewriter] Shared price_min={shared_min} applied to all {len(all_groups)} groups")
+        # Same guard: only into groups with NO price constraint at all.
+        source_is_standalone = any(
+            g.filters.get("price_min") == shared_min and "price_max" not in g.filters
+            for g in all_groups
+        )
+        if source_is_standalone:
+            for g in all_groups:
+                if "price_min" not in g.filters and "price_max" not in g.filters:
+                    g.filters["price_min"] = shared_min
+            print(f"[QueryRewriter] Shared price_min={shared_min} applied to groups with no price")
+
+    # ── Propagate a shared between-range to groups with no price at all ───────
+    # Mirrors "food and toys under 20" behaviour but for between-ranges.
+    # "food and toys between 10 and 50" splits into food={} and toys={min,max}.
+    # Since only one unique (min, max) pair exists and at least one group has
+    # no price at all, treat the range as a shared constraint for all.
+    between_pairs = {
+        (g.filters["price_min"], g.filters["price_max"])
+        for g in all_groups
+        if "price_min" in g.filters and "price_max" in g.filters
+    }
+    unpriceed_groups = [
+        g for g in all_groups
+        if "price_min" not in g.filters and "price_max" not in g.filters
+    ]
+    if len(between_pairs) == 1 and unpriceed_groups:
+        shared_pair_min, shared_pair_max = next(iter(between_pairs))
+        for g in unpriceed_groups:
+            g.filters["price_min"] = shared_pair_min
+            g.filters["price_max"] = shared_pair_max
+        print(f"[QueryRewriter] Shared between-range ({shared_pair_min},{shared_pair_max}) applied to {len(unpriceed_groups)} group(s)")
 
     # Union of all intents (deduplicated, preserving order)
     merged_intents = list(dict.fromkeys(
@@ -279,6 +467,35 @@ def rewrite(query: str, intents: list[str], slots: dict) -> RewrittenQuery:
     # Always apply modifier-word stripping so noisy fragments like
     # "i want food" are cleaned to "food" before BERT embedding.
 
+    # --- Between-range detection (highest priority, no training needed) ---
+    between_range = extract_between_range(query)
+    if between_range is not None:
+        price_min_val, price_max_val = between_range
+        slots["PRICE_MIN"] = str(price_min_val)
+        slots["PRICE_MAX"] = str(price_max_val)
+        print(f"[QueryRewriter] Between-range: PRICE_MIN={price_min_val}, PRICE_MAX={price_max_val} (from '{query}')")
+
+    # --- Dual-direction detection: "less than X more than Y" / "under X above Y" ---
+    # Handles queries that state both bounds in plain English without "between".
+    # Runs before the single-direction fallback so it takes priority.
+    if "PRICE_MIN" not in slots and "PRICE_MAX" not in slots:
+        _MAX_PAT = r'(?:less\s+than|under|below|at\s+most|cheaper\s+than)'
+        _MIN_PAT = r'(?:more\s+than|above|over|at\s+least|higher\s+than)'
+        _NUM     = r'(\d+(?:\.\d+)?)'
+        # max … min  e.g. "less than 25 more than 20"
+        m = re.search(rf'{_MAX_PAT}\s+{_NUM}[^0-9]*{_MIN_PAT}\s+{_NUM}', query, re.IGNORECASE)
+        if m:
+            slots["PRICE_MAX"] = m.group(1)
+            slots["PRICE_MIN"] = m.group(2)
+            print(f"[QueryRewriter] Dual-direction (max,min): PRICE_MAX={m.group(1)}, PRICE_MIN={m.group(2)} (from '{query}')")
+        else:
+            # min … max  e.g. "more than 20 less than 25"
+            m = re.search(rf'{_MIN_PAT}\s+{_NUM}[^0-9]*{_MAX_PAT}\s+{_NUM}', query, re.IGNORECASE)
+            if m:
+                slots["PRICE_MIN"] = m.group(1)
+                slots["PRICE_MAX"] = m.group(2)
+                print(f"[QueryRewriter] Dual-direction (min,max): PRICE_MIN={m.group(1)}, PRICE_MAX={m.group(2)} (from '{query}')")
+
     # --- Correct price slot direction ---
     # The NER model may tag the price value as PRICE_MAX when the user
     # actually means "more than X" (a minimum), or vice versa.
@@ -288,15 +505,18 @@ def rewrite(query: str, intents: list[str], slots: dict) -> RewrittenQuery:
     has_min = "PRICE_MIN" in slots
     has_max = "PRICE_MAX" in slots
 
-    if direction == "min" and has_max and not has_min:
-        # NER said PRICE_MAX but user said "more than" → swap to PRICE_MIN
-        slots["PRICE_MIN"] = slots.pop("PRICE_MAX")
-    elif direction == "max" and has_min and not has_max:
-        # NER said PRICE_MIN but user said "under" → swap to PRICE_MAX
-        slots["PRICE_MAX"] = slots.pop("PRICE_MIN")
+    # Skip direction correction when both slots already set (between-range or dual-direction)
+    if not (has_min and has_max):
+        if direction == "min" and has_max and not has_min:
+            # NER said PRICE_MAX but user said "more than" → swap to PRICE_MIN
+            slots["PRICE_MIN"] = slots.pop("PRICE_MAX")
+        elif direction == "max" and has_min and not has_max:
+            # NER said PRICE_MIN but user said "under" → swap to PRICE_MAX
+            slots["PRICE_MAX"] = slots.pop("PRICE_MIN")
 
     # --- Regex fallback: extract price if NER missed it ---
     # Covers patterns like "less than 30", "under 500", "more than 100", etc.
+    # Skip when both slots already populated.
     if direction is not None and "PRICE_MIN" not in slots and "PRICE_MAX" not in slots:
         price_match = re.search(r'(\d+(?:\.\d+)?)', query)
         if price_match:
@@ -359,10 +579,12 @@ def rewrite(query: str, intents: list[str], slots: dict) -> RewrittenQuery:
             SearchGroup(search_text=p, filters=dict(filters))  # copy filters to each group
             for p in product_slots
         ]
-        intents_out = list(intents)
+        intents_out = list(intents) or ["single_search"]
         if "multi_search" not in intents_out:
             intents_out.insert(0, "multi_search")
         intents_out = [i for i in intents_out if i != "single_search"]
+        if filters and "filtered_search" not in intents_out:
+            intents_out.append("filtered_search")
         print(f"[QueryRewriter] Multi-product in single sentence: {product_slots} | filters={filters}")
         return RewrittenQuery(
             search_text=" | ".join(product_slots),
@@ -396,12 +618,29 @@ def rewrite(query: str, intents: list[str], slots: dict) -> RewrittenQuery:
         cleaned = [
             w for w in words
             if w.lower() not in MODIFIER_WORDS
-            and not re.match(r"^\d+$", w)
+            and not re.match(r"^\d+(?:\.\d+)?$", w)
         ]
         search_text = " ".join(cleaned) if cleaned else query.strip()
 
+    # --- Rule-based intent fallback ---
+    # If the BERT intent classifier returned nothing (model not loaded, low
+    # confidence, or unseen pattern like "less than X more than Y"), infer
+    # intents from what the rewriter itself extracted so the frontend always
+    # receives at least one intent.
+    intents_out = list(intents)
+    if not intents_out:
+        if filters:
+            # Has price/brand/color filters → filtered_search + single_search
+            intents_out = ["filtered_search", "single_search"]
+            print(f"[QueryRewriter] Intent fallback: filtered_search+single_search (filters={list(filters.keys())})")
+        else:
+            # Plain product lookup with no filters → single_search
+            intents_out = ["single_search"]
+            print(f"[QueryRewriter] Intent fallback: single_search (no filters)")
+
     result.search_text = search_text
     result.filters = filters
+    result.intents = intents_out
     result.is_rewritten = bool(filters) or (search_text != query.strip())
 
     return result
