@@ -54,7 +54,7 @@ from models.bert_service import bert_service
 from models.classifier import classifier_service, LABEL_PRIORITY
 from models.ranker import ranker_service
 from models.query_rewriter import query_rewriter
-from models.static_search import match_static_category, FOOD_COMPLEMENT_TITLES
+from models.static_search import match_static_category, FOOD_COMPLEMENT_TITLES, MEAT_COMPLEMENT_TITLES
 from database import search_similar_products, search_similar_products_filtered, get_supabase
 from config import (
     SEARCH_TOP_K_CANDIDATES,
@@ -310,8 +310,14 @@ def _try_static_search(rewritten, max_results: int):
                 return None
             static_category_matched = True
             print(f"[Search] Static check: group {i+1} '{group.search_text}' → matched {len(titles)} titles")
-            # For broad food queries, canned goods are Complement results
-            comp = FOOD_COMPLEMENT_TITLES if group.search_text.lower() in ("food", "foods") else None
+            # Assign Complement label for canned goods within broad food/meat queries
+            key = group.search_text.lower()
+            if key in ("food", "foods"):
+                comp = FOOD_COMPLEMENT_TITLES
+            elif key in ("meat", "meats"):
+                comp = MEAT_COMPLEMENT_TITLES
+            else:
+                comp = None
             group_results = _fetch_static_products(titles, group.filters, complement_titles=comp)
             print(f"[Search] Static check: group {i+1} → {len(group_results)} products found in DB (out of {len(titles)} in static list)")
             all_results.extend(group_results[:per_group_limit])

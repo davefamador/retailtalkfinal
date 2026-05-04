@@ -89,8 +89,8 @@ STATIC_CATEGORIES = {
     "rice food":    ["Biko", "Puto Maya", "Binignit"],
     "rice":         ["Biko", "Puto Maya"],
 
-    "meat":  ["Beef Rendang", "Tiyula Itum", "Pastil", "Kebab", "Satay", "Pate"],
-    "meats": ["Beef Rendang", "Tiyula Itum", "Pastil", "Kebab", "Satay", "Pate"],
+    "meat":  ["Beef Rendang", "Tiyula Itum", "Pastil", "Kebab", "Satay", "Pate", "Luncheon Meat", "Meat Loaf"],
+    "meats": ["Beef Rendang", "Tiyula Itum", "Pastil", "Kebab", "Satay", "Pate", "Luncheon Meat", "Meat Loaf"],
 
     "canned goods":    ["Sardines", "Luncheon Meat", "Meat Loaf", "Corned Beef"],
     "canned good":     ["Sardines", "Luncheon Meat", "Meat Loaf", "Corned Beef"],
@@ -186,6 +186,9 @@ STATIC_CATEGORIES = {
 
 # Titles that appear in the "food" category but are canned goods — shown as Complement
 FOOD_COMPLEMENT_TITLES: set[str] = {"Sardines", "Luncheon Meat", "Corned Beef", "Meat Loaf"}
+
+# Titles that appear in the "meat/meats" category but are canned — shown as Complement
+MEAT_COMPLEMENT_TITLES: set[str] = {"Luncheon Meat", "Meat Loaf"}
 
 # Summer food = seasonal food EXCLUDING sardines, luncheon meat, canned goods, and snacks
 SUMMER_FOOD_TITLES = [
