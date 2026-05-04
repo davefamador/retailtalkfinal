@@ -295,6 +295,10 @@ def _try_static_search(rewritten, max_results: int):
             print(f"[Search] Static check: no search groups — skipping")
             return None
 
+        num_groups = len(rewritten.search_groups)
+        # Give each group a fair share so one large category can't crowd out others
+        per_group_limit = max(5, max_results // num_groups) if num_groups > 1 else max_results
+
         all_results = []
         static_category_matched = False
 
@@ -310,7 +314,7 @@ def _try_static_search(rewritten, max_results: int):
             comp = FOOD_COMPLEMENT_TITLES if group.search_text.lower() in ("food", "foods") else None
             group_results = _fetch_static_products(titles, group.filters, complement_titles=comp)
             print(f"[Search] Static check: group {i+1} → {len(group_results)} products found in DB (out of {len(titles)} in static list)")
-            all_results.extend(group_results)
+            all_results.extend(group_results[:per_group_limit])
 
         # If the query matched a static category, always return static results (even if empty).
         # This hides products not yet in the database instead of leaking ML pipeline results.
