@@ -73,14 +73,24 @@ STATIC_CATEGORIES = {
     "long sleeve":              ["Long Sleeve"],
     "summer hat":               ["Summer Hat"],
     "hat":                      ["Hat"],
+    "Garlic Luncheon Meat":["Garlic Luncheon Meat"],
+    "garlic":["Garlic Luncheon Meat"],
+    "luncheon meat garlic":["Garlic Luncheon Meat"],
+    "luncheon meat garlic flavor":["Garlic Luncheon Meat"],
+    "meat garlic":["Garlic Luncheon Meat"],
+    "meat garlic flavor":["Garlic Luncheon Meat","luncheon meat"],
+    "meat luncheon":["Garlic Luncheon Meat"],
+    
+    "Purefoods":["Purefoods", "Purefoods Corned Beef", "Purefoods Luncheon Meat"],
+
 
     # ── Food groups ───────────────────────────────────────────────────────────
     "kakanin":      ["Biko", "Puto Maya", "Binignit"],
     "rice food":    ["Biko", "Puto Maya", "Binignit"],
     "rice":         ["Biko", "Puto Maya"],
 
-    "meat":  ["Beef Rendang", "Tiyula Itum", "Pastil", "Kebab", "Satay", "Pate", "Meat Loaf"],
-    "meats": ["Beef Rendang", "Tiyula Itum", "Pastil", "Kebab", "Satay", "Pate", "Meat Loaf"],
+    "meat":  ["Beef Rendang", "Tiyula Itum", "Pastil", "Kebab", "Satay", "Pate"],
+    "meats": ["Beef Rendang", "Tiyula Itum", "Pastil", "Kebab", "Satay", "Pate"],
 
     "canned goods":    ["Sardines", "Luncheon Meat", "Meat Loaf", "Corned Beef"],
     "canned good":     ["Sardines", "Luncheon Meat", "Meat Loaf", "Corned Beef"],
