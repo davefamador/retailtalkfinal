@@ -161,12 +161,12 @@ def split_compound_query(query: str) -> list[str]:
 
 def _split_space_separated_products(part: str) -> list[str]:
     """
-    Handle queries like "food toys drinks snacks under 50" where products are
-    listed with spaces but no conjunctions or commas.
+    Handle queries like "food toys drinks snacks under 50" or "under 50 food clothes"
+    where products are listed with spaces but no conjunctions or commas.
 
-    Strategy: strip price-modifier tail, then greedily match the longest
-    static-category token sequence from left to right. If 2+ distinct
-    products are found, re-attach the price tail to each.
+    Strategy: strip a leading OR trailing price clause, then greedily match the
+    longest static-category token sequence left to right. If 2+ distinct products
+    are found, re-attach the price clause to each.
 
     Returns the original part unchanged (as a one-element list) when fewer
     than 2 products are identified — preserving all existing behaviour.
@@ -174,20 +174,34 @@ def _split_space_separated_products(part: str) -> list[str]:
     # Lazy import to avoid circular dependency
     from models.static_search import _STATIC_CATEGORIES_LOWER
 
-    # Separate the price-modifier tail from the product tokens.
-    # Price tail starts at the first modifier word or digit.
+    _PRICE_CLAUSE_RE = re.compile(
+        r'(?:under|below|less\s+than|above|over|more\s+than|at\s+(?:most|least)'
+        r'|between|cheaper\s+than|budget|affordable|cheap|pricey|priced|costing|worth)'
+        r'\s+\d+(?:\.\d+)?(?:\s+(?:and|to)\s+\d+(?:\.\d+)?)?',
+        re.IGNORECASE,
+    )
+
+    # --- Leading price prefix: "under 50 food clothes" (check first) ---
+    lead_match = _PRICE_CLAUSE_RE.match(part.strip())
+
+    # --- Trailing price tail: "food clothes under 50" ---
     price_tail_re = re.compile(
         r'\s+(?:under|below|less|above|over|more|at|between|cheaper|budget'
         r'|affordable|cheap|pricey|priced|costing|worth|\d).*$',
         re.IGNORECASE,
     )
     tail_match = price_tail_re.search(part)
-    if tail_match:
+
+    price_clause = ""
+    product_segment = part.strip()
+
+    if lead_match:
+        # Leading filter wins — strip the price prefix, keep products as segment
+        price_clause = lead_match.group(0).strip()
+        product_segment = part.strip()[lead_match.end():].strip()
+    elif tail_match:
         product_segment = part[:tail_match.start()].strip()
-        price_tail = part[tail_match.start():].strip()
-    else:
-        product_segment = part.strip()
-        price_tail = ""
+        price_clause = part[tail_match.start():].strip()
 
     if not product_segment:
         return [part]
@@ -198,7 +212,6 @@ def _split_space_separated_products(part: str) -> list[str]:
     i = 0
     while i < len(words):
         matched = None
-        # Try longest span first (up to remaining words)
         for span in range(len(words) - i, 0, -1):
             candidate = " ".join(words[i:i + span]).lower()
             if candidate in _STATIC_CATEGORIES_LOWER:
@@ -214,9 +227,13 @@ def _split_space_separated_products(part: str) -> list[str]:
     if len(products) < 2:
         return [part]
 
-    # Re-attach the price tail to each product
-    if price_tail:
-        return [f"{p} {price_tail}" for p in products]
+    # Re-attach the price clause to each product
+    if price_clause:
+        if tail_match:
+            return [f"{p} {price_clause}" for p in products]
+        else:
+            # Leading prefix: rewrite as trailing so each sub-part is parseable
+            return [f"{p} {price_clause}" for p in products]
     return products
 
 
