@@ -286,6 +286,22 @@ def _merge_rewritten_queries(
             seen_groups[key] = g
     all_groups = list(seen_groups.values())
 
+    # Deduplicate groups that resolve to the same static product set.
+    # e.g. "canned goods" and "canned good" both map to ["Sardines", ...].
+    # Keep the first occurrence, drop later duplicates.
+    from models.static_search import match_static_category
+    seen_static_keys: set[str] = set()
+    deduped: list[SearchGroup] = []
+    for g in all_groups:
+        titles = match_static_category(g.search_text)
+        if titles is not None:
+            static_key = "|".join(sorted(titles)) + "|" + str(sorted(g.filters.items()))
+            if static_key in seen_static_keys:
+                continue
+            seen_static_keys.add(static_key)
+        deduped.append(g)
+    all_groups = deduped
+
     # ── Propagate shared price filter to groups that have no price of their own ─
     # When the user writes "food and toys less than 20", splitting produces one
     # group with price_max=20 and another with none.  Since only a single unique
