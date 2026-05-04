@@ -90,9 +90,11 @@ STATIC_CATEGORIES = {
     "canned":          ["Sardines", "Luncheon Meat", "Meat Loaf", "Corned Beef"],
 
     "food":  ["Beef Rendang", "Tiyula Itum", "Pastil", "Kebab", "Escabeche", "Biko",
-              "Puto Maya", "Binignit", "Buko Juice", "Shawarma", "Satay", "Pate"],
+              "Puto Maya", "Binignit", "Buko Juice", "Shawarma", "Satay", "Pate",
+              "Sardines", "Luncheon Meat", "Corned Beef", "Meat Loaf"],
     "foods": ["Beef Rendang", "Tiyula Itum", "Pastil", "Kebab", "Escabeche", "Biko",
-              "Puto Maya", "Binignit", "Buko Juice", "Shawarma", "Satay", "Pate"],
+              "Puto Maya", "Binignit", "Buko Juice", "Shawarma", "Satay", "Pate",
+              "Sardines", "Luncheon Meat", "Corned Beef", "Meat Loaf"],
 
     # Halal / Muslim food
     "halal food":  ["Beef Rendang", "Tiyula Itum", "Pastil", "Kebab", "Satay", "Pate"],
@@ -171,6 +173,9 @@ STATIC_CATEGORIES = {
     "summer":         ["shorts", "flip flops", "shirt", "Sarouel Pants",
                        "Jacket", "Keffiyeh", "Long Sleeve", "Summer Hat", "Hat"],
 }
+
+# Titles that appear in the "food" category but are canned goods — shown as Complement
+FOOD_COMPLEMENT_TITLES: set[str] = {"Sardines", "Luncheon Meat", "Corned Beef", "Meat Loaf"}
 
 # Summer food = seasonal food EXCLUDING sardines, luncheon meat, canned goods, and snacks
 SUMMER_FOOD_TITLES = [

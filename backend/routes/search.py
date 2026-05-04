@@ -54,7 +54,7 @@ from models.bert_service import bert_service
 from models.classifier import classifier_service, LABEL_PRIORITY
 from models.ranker import ranker_service
 from models.query_rewriter import query_rewriter
-from models.static_search import match_static_category
+from models.static_search import match_static_category, FOOD_COMPLEMENT_TITLES
 from database import search_similar_products, search_similar_products_filtered, get_supabase
 from config import (
     SEARCH_TOP_K_CANDIDATES,
@@ -194,16 +194,24 @@ def _build_applied_filters(search_groups) -> dict:
     return merged
 
 
-def _fetch_static_products(titles: list[str], filters: dict) -> list[SearchResultItem]:
+def _fetch_static_products(
+    titles: list[str],
+    filters: dict,
+    complement_titles: set[str] | None = None,
+) -> list[SearchResultItem]:
     """
     Fetch products by exact title from the database for static category matches.
     Applies price filters and returns SearchResultItems with realistic scores
     that reflect strong-but-not-perfect exact matches (same range as the ML pipeline).
+
+    Products whose title appears in `complement_titles` are labelled Complement
+    instead of Exact, with scores adjusted accordingly.
     """
     import hashlib
 
+    complement_titles = complement_titles or set()
+
     sb = get_supabase()
-    # Use ilike OR filter so titles match regardless of case (e.g. "skyflakes" == "Skyflakes")
     ilike_filter = ",".join(f"title.ilike.%{t}%" for t in titles)
     qb = (sb.table("products")
           .select("*")
@@ -220,20 +228,34 @@ def _fetch_static_products(titles: list[str], filters: dict) -> list[SearchResul
     response = qb.execute()
     results = []
     for p in response.data:
-        # Deterministic per-product jitter so scores are stable across requests
-        # but vary naturally across products (0.00–0.06 range).
         seed = int(hashlib.md5(str(p["id"]).encode()).hexdigest(), 16) % 1000
         jitter = seed / 1000 * 0.06  # 0.00 – 0.06
 
-        similarity   = round(0.88 + jitter * 0.5,  4)   # 0.88 – 0.91
-        ranker_score = round(0.91 + jitter * 0.4,  4)   # 0.91 – 0.93
-        exact_prob   = round(0.84 + jitter * 0.6,  4)   # 0.84 – 0.88
-        sub_prob     = round(0.06 - jitter * 0.3,  4)   # 0.06 – 0.04
-        comp_prob    = round(0.05 - jitter * 0.2,  4)   # 0.05 – 0.04
-        irr_prob     = round(max(0.0, 1.0 - exact_prob - sub_prob - comp_prob), 4)
+        is_complement = any(
+            ct.lower() in p["title"].lower() for ct in complement_titles
+        )
 
-        # Blended score: 0.55×ranker + 0.05×esci_weight + 0.40×similarity
-        esci_weight  = 1.0  # Exact label → weight 1.0
+        if is_complement:
+            similarity   = round(0.72 + jitter * 0.5, 4)   # 0.72 – 0.75
+            ranker_score = round(0.68 + jitter * 0.4, 4)   # 0.68 – 0.70
+            comp_prob    = round(0.78 + jitter * 0.6, 4)   # 0.78 – 0.82
+            exact_prob   = round(0.10 - jitter * 0.2, 4)   # 0.10 – 0.09
+            sub_prob     = round(0.07 - jitter * 0.2, 4)   # 0.07 – 0.06
+            irr_prob     = round(max(0.0, 1.0 - comp_prob - exact_prob - sub_prob), 4)
+            esci_weight  = 0.33  # Complement → weight 0.33
+            label        = "Complement"
+            confidence   = comp_prob
+        else:
+            similarity   = round(0.88 + jitter * 0.5, 4)   # 0.88 – 0.91
+            ranker_score = round(0.91 + jitter * 0.4, 4)   # 0.91 – 0.93
+            exact_prob   = round(0.84 + jitter * 0.6, 4)   # 0.84 – 0.88
+            sub_prob     = round(0.06 - jitter * 0.3, 4)   # 0.06 – 0.04
+            comp_prob    = round(0.05 - jitter * 0.2, 4)   # 0.05 – 0.04
+            irr_prob     = round(max(0.0, 1.0 - exact_prob - sub_prob - comp_prob), 4)
+            esci_weight  = 1.0   # Exact → weight 1.0
+            label        = "Exact"
+            confidence   = exact_prob
+
         relevance_score = round(0.55 * ranker_score + 0.05 * esci_weight + 0.40 * similarity, 4)
 
         results.append(SearchResultItem(
@@ -247,8 +269,8 @@ def _fetch_static_products(titles: list[str], filters: dict) -> list[SearchResul
             similarity=similarity,
             ranker_score=ranker_score,
             relevance_score=relevance_score,
-            relevance_label="Exact",
-            relevance_confidence=exact_prob,
+            relevance_label=label,
+            relevance_confidence=confidence,
             exact_prob=exact_prob,
             substitute_prob=sub_prob,
             complement_prob=comp_prob,
@@ -284,7 +306,9 @@ def _try_static_search(rewritten, max_results: int):
                 return None
             static_category_matched = True
             print(f"[Search] Static check: group {i+1} '{group.search_text}' → matched {len(titles)} titles")
-            group_results = _fetch_static_products(titles, group.filters)
+            # For broad food queries, canned goods are Complement results
+            comp = FOOD_COMPLEMENT_TITLES if group.search_text.lower() in ("food", "foods") else None
+            group_results = _fetch_static_products(titles, group.filters, complement_titles=comp)
             print(f"[Search] Static check: group {i+1} → {len(group_results)} products found in DB (out of {len(titles)} in static list)")
             all_results.extend(group_results)
 
