@@ -459,14 +459,36 @@ def _run_search_pipeline(
 
     scored = []
     for idx, (cand, cls) in enumerate(zip(candidates, classifications)):
-        label = cls["label"]
         r_score = float(ranker_scores[idx])
         sim = float(cand["similarity"])
 
-        # Evidence override: demote Irrelevant → Substitute when retrieval signals agree
-        if label == "Irrelevant" and r_score >= STRONG_MATCH_RANKER and sim >= STRONG_MATCH_SIM:
-            label = "Substitute"
-            cls = {**cls, "label": "Substitute"}
+        if show_all and not has_embeddings:
+            # No embeddings available — derive ESCI from ranker score alone.
+            # CrossEncoder scores are normalised 0-1 across this batch.
+            if r_score >= 0.70:
+                label = "Exact"
+                e_prob, s_prob, c_prob, i_prob = r_score, (1-r_score)*0.4, (1-r_score)*0.3, (1-r_score)*0.3
+            elif r_score >= 0.45:
+                label = "Substitute"
+                e_prob, s_prob, c_prob, i_prob = r_score*0.3, r_score, (1-r_score)*0.5, (1-r_score)*0.5
+            elif r_score >= 0.25:
+                label = "Complement"
+                e_prob, s_prob, c_prob, i_prob = r_score*0.2, r_score*0.3, r_score, 1-r_score*1.5
+            else:
+                label = "Irrelevant"
+                e_prob, s_prob, c_prob, i_prob = 0.0, 0.0, 0.0, 0.0
+            confidence = r_score if label != "Irrelevant" else 0.0
+            cls = {"label": label, "confidence": round(confidence, 4),
+                   "exact_prob": round(max(0.0, e_prob), 4),
+                   "substitute_prob": round(max(0.0, s_prob), 4),
+                   "complement_prob": round(max(0.0, c_prob), 4),
+                   "irrelevant_prob": round(max(0.0, i_prob), 4)}
+        else:
+            label = cls["label"]
+            # Evidence override: demote Irrelevant → Substitute when retrieval signals agree
+            if label == "Irrelevant" and r_score >= STRONG_MATCH_RANKER and sim >= STRONG_MATCH_SIM:
+                label = "Substitute"
+                cls = {**cls, "label": "Substitute"}
 
         rel = _compute_blended_score(r_score, _label_to_priority_weight(label), sim, w_r, w_c, w_s)
         if not show_all and rel < MIN_RELEVANCE_SCORE:
