@@ -385,27 +385,40 @@ def _run_search_pipeline(
     if filters.get("brand"):
         print(f"[Search]   Brand slot='{filters['brand']}' — handled via BERT embedding, not SQL filter")
 
-    # Only price is used as a hard DB filter; brand/color are semantic (BERT)
-    has_price_filter = filters.get("price_min") is not None or filters.get("price_max") is not None
-    if has_price_filter:
-        raw_candidates = search_similar_products_filtered(
-            query_embedding, top_k=max_candidates,
-            price_min=filters.get("price_min"), price_max=filters.get("price_max"),
-        )
+    if show_all:
+        # Admin mode: fetch every active/approved product so nothing is hidden by
+        # the pgvector top-K cap. Similarity is set to 0 (no vector ranking needed).
+        sb = get_supabase()
+        qb = (sb.table("products").select("*")
+              .eq("is_active", True).eq("status", "approved").gt("stock", 0))
+        if filters.get("price_max") is not None:
+            qb = qb.lte("price", filters["price_max"])
+        if filters.get("price_min") is not None:
+            qb = qb.gte("price", filters["price_min"])
+        db_rows = qb.execute().data
+        candidates = [{**r, "similarity": 0.0, "embedding": r.get("embedding") or []} for r in db_rows]
+        print(f"[Search]   '{search_text}' (show_all): {len(candidates)} total products from DB")
     else:
-        raw_candidates = search_similar_products(query_embedding, top_k=max_candidates)
+        # Only price is used as a hard DB filter; brand/color are semantic (BERT)
+        has_price_filter = filters.get("price_min") is not None or filters.get("price_max") is not None
+        if has_price_filter:
+            raw_candidates = search_similar_products_filtered(
+                query_embedding, top_k=max_candidates,
+                price_min=filters.get("price_min"), price_max=filters.get("price_max"),
+            )
+        else:
+            raw_candidates = search_similar_products(query_embedding, top_k=max_candidates)
 
-    print(f"[Search]   '{search_text}': {len(raw_candidates)} raw candidates")
+        print(f"[Search]   '{search_text}': {len(raw_candidates)} raw candidates")
 
-    # Hard post-filter: enforce price constraints even if pgvector missed them
-    # (safety net for cases where the DB filter didn't apply, e.g. no-filter branch)
-    if filters.get("price_max") is not None:
-        raw_candidates = [c for c in raw_candidates if float(c["price"]) <= filters["price_max"]]
-    if filters.get("price_min") is not None:
-        raw_candidates = [c for c in raw_candidates if float(c["price"]) >= filters["price_min"]]
+        if filters.get("price_max") is not None:
+            raw_candidates = [c for c in raw_candidates if float(c["price"]) <= filters["price_max"]]
+        if filters.get("price_min") is not None:
+            raw_candidates = [c for c in raw_candidates if float(c["price"]) >= filters["price_min"]]
 
-    MIN_SIMILARITY_THRESHOLD = 0.20
-    candidates = raw_candidates if show_all else [c for c in raw_candidates if c["similarity"] >= MIN_SIMILARITY_THRESHOLD]
+        candidates = [c for c in raw_candidates if c["similarity"] >= 0.20]
+
+    candidates = [c for c in candidates if c.get("embedding") is not None and len(c.get("embedding") or []) > 0]
     if not candidates:
         return []
 

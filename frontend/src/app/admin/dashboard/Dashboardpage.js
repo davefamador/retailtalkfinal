@@ -791,7 +791,7 @@ export default function AdminDashboard() {
         if (!adminSearchQuery.trim()) return;
         setAdminSearchLoading(true);
         try {
-            const res = await searchProducts(adminSearchQuery, 20, true);
+            const res = await searchProducts(adminSearchQuery, 100, true);
             setAdminSearchResults(res);
         } catch (err) { setMessage({ type: 'error', text: err.message }); }
         finally { setAdminSearchLoading(false); }
