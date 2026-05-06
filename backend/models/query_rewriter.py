@@ -151,25 +151,30 @@ _INTENT_RULES: list[tuple] = [
 ]
 
 
+# Shared sub-patterns for dual-direction price ranges
+_MIN_KW = r'(?:more\s+than|above|over|at\s+least|higher\s+than)'
+_MAX_KW = r'(?:less\s+than|under|below|at\s+most|cheaper\s+than)'
+_NUM_P  = r'\d+(?:\.\d+)?(?:\s+pesos?|php)?'
+
 # Price clause pattern — matches trailing or inline price filters so they can
 # be stripped before category matching and re-attached afterwards.
-# Handles: "less than 300 pesos", "under 500", "between 100 and 400",
-#          "more than 50", "more than 200 and less than 300"
+# Dual-direction variants (with or without "and") are checked first so the
+# greedy single-bound fallback never splits them.
 _PRICE_CLAUSE_RE = re.compile(
-    r'(\s+(?:more\s+than|above|over|at\s+least)\s+\d+(?:\.\d+)?(?:\s+pesos?|php)?\s+and\s+(?:less\s+than|under|below|at\s+most)\s+\d+(?:\.\d+)?(?:\s+pesos?|php)?'
-    r'|\s+(?:less\s+than|under|below|at\s+most)\s+\d+(?:\.\d+)?(?:\s+pesos?|php)?\s+and\s+(?:more\s+than|above|over|at\s+least)\s+\d+(?:\.\d+)?(?:\s+pesos?|php)?'
-    r'|\s+(?:less\s+than|under|below|at\s+most|cheaper\s+than|more\s+than|above|over|at\s+least)\s+\d+(?:\.\d+)?(?:\s+pesos?|php)?'
-    r'|\s+between\s+\d+(?:\.\d+)?\s+(?:and|to)\s+\d+(?:\.\d+)?(?:\s+pesos?|php)?)',
+    rf'(\s+{_MIN_KW}\s+{_NUM_P}\s+(?:and\s+)?{_MAX_KW}\s+{_NUM_P}'   # more than X [and] less than Y
+    rf'|\s+{_MAX_KW}\s+{_NUM_P}\s+(?:and\s+)?{_MIN_KW}\s+{_NUM_P}'   # less than X [and] more than Y
+    rf'|\s+{_MIN_KW}\s+{_NUM_P}'                                        # more than X  (single)
+    rf'|\s+{_MAX_KW}\s+{_NUM_P}'                                        # less than X  (single)
+    rf'|\s+between\s+\d+(?:\.\d+)?\s+(?:and|to)\s+{_NUM_P})',          # between X and Y
     re.IGNORECASE,
 )
 
-# Matches a between-range OR a dual-direction range so we can exclude its
-# "and" from the conjunction guard.
-# e.g. "between 100 and 400"  OR  "more than 200 and less than 300"
+# Matches any dual-direction or between-range so its "and" is excluded from
+# the conjunction guard (both in _normalise_seasonal_clothing and split_compound_query).
 _BETWEEN_RANGE_RE = re.compile(
-    r'\bbetween\s+\d+(?:\.\d+)?\s+(?:and|to)\s+\d+(?:\.\d+)?'
-    r'|(?:more\s+than|above|over|at\s+least)\s+\d+(?:\.\d+)?\s+and\s+(?:less\s+than|under|below|at\s+most)\s+\d+(?:\.\d+)?'
-    r'|(?:less\s+than|under|below|at\s+most)\s+\d+(?:\.\d+)?\s+and\s+(?:more\s+than|above|over|at\s+least)\s+\d+(?:\.\d+)?',
+    rf'\bbetween\s+\d+(?:\.\d+)?\s+(?:and|to)\s+\d+(?:\.\d+)?'
+    rf'|{_MIN_KW}\s+{_NUM_P}\s+(?:and\s+)?{_MAX_KW}\s+\d+(?:\.\d+)?'
+    rf'|{_MAX_KW}\s+{_NUM_P}\s+(?:and\s+)?{_MIN_KW}\s+\d+(?:\.\d+)?',
     re.IGNORECASE
 )
 
@@ -267,10 +272,12 @@ def _strip_between_clause(query: str) -> str:
     return _BETWEEN_RE.sub("", query).strip()
 
 
-# Dual-direction price range: "more than X and less than Y" / "under X and above Y"
+# Dual-direction price range: "more than X [and] less than Y" / "under X [and] above Y"
+# The "and" is optional so both "more than 200 and less than 300" and
+# "more than 200 less than 300" are treated as a single price clause.
 _DUAL_DIRECTION_RE = re.compile(
-    r'(?:more\s+than|above|over|at\s+least)\s+\d+(?:\.\d+)?(?:\s+pesos?|php)?\s+and\s+(?:less\s+than|under|below|at\s+most)\s+\d+(?:\.\d+)?(?:\s+pesos?|php)?'
-    r'|(?:less\s+than|under|below|at\s+most)\s+\d+(?:\.\d+)?(?:\s+pesos?|php)?\s+and\s+(?:more\s+than|above|over|at\s+least)\s+\d+(?:\.\d+)?(?:\s+pesos?|php)?',
+    rf'{_MIN_KW}\s+{_NUM_P}\s+(?:and\s+)?{_MAX_KW}\s+{_NUM_P}'
+    rf'|{_MAX_KW}\s+{_NUM_P}\s+(?:and\s+)?{_MIN_KW}\s+{_NUM_P}',
     re.IGNORECASE,
 )
 
