@@ -458,10 +458,17 @@ def split_sentences(query: str) -> list[str]:
     for part in comma_parts:
         conj_parts.extend(split_compound_query(part))
 
-    # Space-separated product list splitting (no conjunctions/commas needed)
+    # Space-separated product list splitting (no conjunctions/commas needed).
+    # First try the contextual normaliser — if a part is a known NLP intent
+    # phrase (e.g. "toys for kids" → "birthday items"), keep it intact instead
+    # of greedily splitting "toys" and "for kids" as separate products.
     all_parts = []
     for part in conj_parts:
-        all_parts.extend(_split_space_separated_products(part))
+        normalised = _normalise_seasonal_clothing(part)
+        if normalised != part:
+            all_parts.append(normalised)
+        else:
+            all_parts.extend(_split_space_separated_products(part))
 
     return all_parts if all_parts else [query.strip()]
 

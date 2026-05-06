@@ -238,39 +238,47 @@ def _fetch_static_products(
     response = qb.execute()
     results = []
     for p in response.data:
-        seed = int(hashlib.md5(str(p["id"]).encode()).hexdigest(), 16) % 1000
-        jitter = seed / 1000 * 0.06  # 0.00 – 0.06
+        # Two hash-derived noise streams per product so different score
+        # components vary independently — gives more realistic-looking ESCI
+        # distributions instead of every Exact product clustering at ~92%.
+        h = hashlib.md5(str(p["id"]).encode()).hexdigest()
+        n1 = int(h[:8],  16) / 0xFFFFFFFF   # 0.0 – 1.0
+        n2 = int(h[8:16], 16) / 0xFFFFFFFF  # 0.0 – 1.0
+        n3 = int(h[16:24],16) / 0xFFFFFFFF  # 0.0 – 1.0
 
         title_lower = p["title"].lower()
         is_complement = any(ct.lower() in title_lower for ct in complement_titles)
         is_substitute = not is_complement and any(st.lower() in title_lower for st in substitute_titles)
 
         if is_complement:
-            similarity   = round(0.72 + jitter * 0.5, 4)
-            ranker_score = round(0.68 + jitter * 0.4, 4)
-            comp_prob    = round(0.78 + jitter * 0.6, 4)
-            exact_prob   = round(0.10 - jitter * 0.2, 4)
-            sub_prob     = round(0.07 - jitter * 0.2, 4)
+            # Complement: confidence band ~0.55 – 0.78 (varied)
+            similarity   = round(0.62 + n1 * 0.20, 4)        # 0.62 – 0.82
+            ranker_score = round(0.58 + n2 * 0.22, 4)        # 0.58 – 0.80
+            comp_prob    = round(0.55 + n3 * 0.23, 4)        # 0.55 – 0.78
+            exact_prob   = round(0.08 + n1 * 0.10, 4)        # 0.08 – 0.18
+            sub_prob     = round(0.06 + n2 * 0.08, 4)        # 0.06 – 0.14
             irr_prob     = round(max(0.0, 1.0 - comp_prob - exact_prob - sub_prob), 4)
             esci_weight  = 0.33
             label        = "Complement"
             confidence   = comp_prob
         elif is_substitute:
-            similarity   = round(0.79 + jitter * 0.5, 4)   # 0.79 – 0.82
-            ranker_score = round(0.75 + jitter * 0.4, 4)   # 0.75 – 0.77
-            sub_prob     = round(0.72 + jitter * 0.6, 4)   # 0.72 – 0.76
-            exact_prob   = round(0.14 - jitter * 0.2, 4)   # 0.14 – 0.13
-            comp_prob    = round(0.08 - jitter * 0.2, 4)   # 0.08 – 0.07
+            # Substitute: confidence band ~0.62 – 0.85 (varied)
+            similarity   = round(0.68 + n1 * 0.20, 4)        # 0.68 – 0.88
+            ranker_score = round(0.65 + n2 * 0.22, 4)        # 0.65 – 0.87
+            sub_prob     = round(0.62 + n3 * 0.23, 4)        # 0.62 – 0.85
+            exact_prob   = round(0.10 + n1 * 0.10, 4)        # 0.10 – 0.20
+            comp_prob    = round(0.06 + n2 * 0.08, 4)        # 0.06 – 0.14
             irr_prob     = round(max(0.0, 1.0 - sub_prob - exact_prob - comp_prob), 4)
             esci_weight  = 0.67
             label        = "Substitute"
             confidence   = sub_prob
         else:
-            similarity   = round(0.88 + jitter * 0.5, 4)
-            ranker_score = round(0.91 + jitter * 0.4, 4)
-            exact_prob   = round(0.84 + jitter * 0.6, 4)
-            sub_prob     = round(0.06 - jitter * 0.3, 4)
-            comp_prob    = round(0.05 - jitter * 0.2, 4)
+            # Exact: confidence band ~0.78 – 0.96 (varied — was clustered ~0.91)
+            similarity   = round(0.78 + n1 * 0.18, 4)        # 0.78 – 0.96
+            ranker_score = round(0.80 + n2 * 0.18, 4)        # 0.80 – 0.98
+            exact_prob   = round(0.78 + n3 * 0.18, 4)        # 0.78 – 0.96
+            sub_prob     = round(0.04 + n1 * 0.08, 4)        # 0.04 – 0.12
+            comp_prob    = round(0.03 + n2 * 0.06, 4)        # 0.03 – 0.09
             irr_prob     = round(max(0.0, 1.0 - exact_prob - sub_prob - comp_prob), 4)
             esci_weight  = 1.0
             label        = "Exact"
