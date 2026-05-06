@@ -241,7 +241,9 @@ def _fetch_static_products(
         # Two hash-derived noise streams per product so different score
         # components vary independently — gives more realistic-looking ESCI
         # distributions instead of every Exact product clustering at ~92%.
-        h = hashlib.md5(str(p["id"]).encode()).hexdigest()
+        # Hash by title so identical products always share the same ESCI scores
+        # regardless of how many rows exist in the DB for the same product name.
+        h = hashlib.md5(p["title"].lower().encode()).hexdigest()
         n1 = int(h[:8],  16) / 0xFFFFFFFF   # 0.0 – 1.0
         n2 = int(h[8:16], 16) / 0xFFFFFFFF  # 0.0 – 1.0
         n3 = int(h[16:24],16) / 0xFFFFFFFF  # 0.0 – 1.0

@@ -120,8 +120,15 @@ _INTENT_RULES: list[tuple] = [
         "snacks",
     ),
     # ── Toys / birthday ───────────────────────────────────────────────────────
+    # "toys in this birthday" / "toys for a birthday party" → birthday toys
     (
-        re.compile(r'\b(toy|toys|gift|gifts|present|presents|play|playing)\b', re.IGNORECASE),
+        re.compile(r'\b(toy|toys|play|playing)\b', re.IGNORECASE),
+        re.compile(r'\b(birthday|party|celebration)\b', re.IGNORECASE),
+        "birthday toys",
+    ),
+    # "gifts/presents for a birthday/party/kids" → birthday items (decorations + toys)
+    (
+        re.compile(r'\b(gift|gifts|present|presents)\b', re.IGNORECASE),
         re.compile(r'\b(birthday|party|celebration|kid|kids|children|child)\b', re.IGNORECASE),
         "birthday items",
     ),

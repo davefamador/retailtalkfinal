@@ -129,6 +129,9 @@ STATIC_CATEGORIES = {
     "Birthday items for boys": ["balloon", "party hats", "party poppers", "party decorations", "Lego", "little", "UNO", "HotWheels", "Playing Cards", "balloons","blue shirt","Gift Box","gift box"],
     "Birthday items for kids": ["balloon", "party hats", "party poppers", "party decorations", "Lego", "little", "UNO", "HotWheels", "Playing Cards", "balloons","pink dress","blue shirt","pink flower","Gift Box","gift box"],
     "Birthday items for adults": ["balloon", "party hats", "party poppers", "party decorations", "Lego", "little", "UNO", "HotWheels", "Playing Cards", "balloons","Gift Box","gift box"],
+    # Birthday toys — toy-specific gifts for a birthday (no decorations)
+    "birthday toys": ["Lego", "little", "UNO", "HotWheels", "Playing Cards", "stuffed toys"],
+    "birthday toy":  ["Lego", "little", "UNO", "HotWheels", "Playing Cards", "stuffed toys"],
     # Lenten season food
     "lenten season food": ["Escabeche", "Biko", "Puto Maya", "Binignit"],
     "lenten food":        ["Escabeche", "Biko", "Puto Maya", "Binignit"],
@@ -257,9 +260,12 @@ STATIC_ESCI: dict[str, dict] = {
     # ── Toys ─────────────────────────────────────────────────────────────────
     # LEGO, UNO, Hot Wheels = Exact toys.
     # Balloons = Complement (party/play, not a toy per se).
-    "toys":     {"complement": {"balloon", "Balloons"}},
-    "toy":      {"complement": {"balloon", "Balloons"}},
-    "for kids": {"complement": {"balloon", "Balloons"}},
+    "toys":          {"complement": {"balloon", "Balloons"}},
+    "toy":           {"complement": {"balloon", "Balloons"}},
+    "for kids":      {"complement": {"balloon", "Balloons"}},
+    # Birthday toys — all items are Exact (they are all playable toys)
+    "birthday toys": {},
+    "birthday toy":  {},
 
     # ── Party supplies ────────────────────────────────────────────────────────
     # Balloons, banner, party pop = Exact.
