@@ -476,6 +476,7 @@ def _run_search_pipeline(
                 continue
             if not show_all and label == "Complement" and not include_complements:
                 continue
+        low_relevance = rel < 0.10
         scored.append(SearchResultItem(
             id=str(cand["id"]), title=cand["title"],
             description=cand.get("description") or "",
@@ -484,12 +485,13 @@ def _run_search_pipeline(
             image_url=_first_image(cand.get("images")),
             seller_id=str(cand["seller_id"]),
             similarity=round(sim, 4), ranker_score=round(r_score, 4),
-            relevance_score=round(rel, 4), relevance_label=label,
-            relevance_confidence=round(cls["confidence"], 4),
-            exact_prob=round(cls.get("exact_prob", 0.0), 4),
-            substitute_prob=round(cls.get("substitute_prob", 0.0), 4),
-            complement_prob=round(cls.get("complement_prob", 0.0), 4),
-            irrelevant_prob=round(cls.get("irrelevant_prob", 0.0), 4),
+            relevance_score=round(rel, 4),
+            relevance_label="Irrelevant" if low_relevance else label,
+            relevance_confidence=0.0 if low_relevance else round(cls["confidence"], 4),
+            exact_prob=0.0 if low_relevance else round(cls.get("exact_prob", 0.0), 4),
+            substitute_prob=0.0 if low_relevance else round(cls.get("substitute_prob", 0.0), 4),
+            complement_prob=0.0 if low_relevance else round(cls.get("complement_prob", 0.0), 4),
+            irrelevant_prob=0.0 if low_relevance else round(cls.get("irrelevant_prob", 0.0), 4),
         ))
     return scored
 
