@@ -90,7 +90,7 @@ class ClassifierService:
             size_pretrained=BERT_EMBEDDING_DIM,
             num_labels=4,
         )
-        self.model.load_state_dict(torch.load(model_path, map_location=self.device))
+        self.model.load_state_dict(torch.load(model_path, map_location=self.device, weights_only=True))
         self.model.to(self.device)
         self.model.eval()
         self._loaded = True

@@ -19,9 +19,12 @@ async def lifespan(app: FastAPI):
     # --- Startup ---
     print(f"[START] Starting {APP_NAME} backend...")
 
-    # Download model weights if aimodels/ folder is missing any file
-    from download_models import download_models
-    download_models()
+    # Download model weights only when trained_model/ is absent (e.g. HF Spaces).
+    # Locally the models already live in backend/trained_model/ — no download needed.
+    import os
+    if not os.path.isdir(os.path.join(os.path.dirname(__file__), "trained_model")):
+        from download_models import download_models
+        download_models()
 
     # Load ML models
     from models.bert_service import bert_service

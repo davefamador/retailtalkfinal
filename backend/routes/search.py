@@ -62,7 +62,12 @@ from config import (
     RANKER_WEIGHT,
     CLASSIFIER_WEIGHT,
     SIMILARITY_WEIGHT,
+    DEBUG,
 )
+
+def _log(*args):
+    if DEBUG:
+        print(*args)
 
 router = APIRouter(prefix="/search", tags=["Search"])
 
@@ -332,7 +337,6 @@ def _try_static_search(rewritten, max_results: int):
     try:
         # Guard: if no search groups exist, fall through to ML pipeline
         if not rewritten.search_groups:
-            print(f"[Search] Static check: no search groups — skipping")
             return None
 
         num_groups = len(rewritten.search_groups)
@@ -346,21 +350,17 @@ def _try_static_search(rewritten, max_results: int):
             titles = match_static_category(group.search_text)
             if titles is None:
                 # At least one group doesn't match — fall through to ML pipeline
-                print(f"[Search] Static check: group {i+1} '{group.search_text}' → no match — falling through")
                 return None
             static_category_matched = True
-            print(f"[Search] Static check: group {i+1} '{group.search_text}' → matched {len(titles)} titles")
             # Resolve ESCI labels: start with hardcoded food/meat overrides,
             # then fall back to per-category STATIC_ESCI overrides.
             comp, sub, irr = get_static_esci(group.search_text)
             group_results = _fetch_static_products(titles, group.filters, complement_titles=comp, substitute_titles=sub, irrelevant_titles=irr)
-            print(f"[Search] Static check: group {i+1} → {len(group_results)} products found in DB (out of {len(titles)} in static list)")
             all_results.extend(group_results[:per_group_limit])
 
         # If the query matched a static category, always return static results (even if empty).
         # This hides products not yet in the database instead of leaking ML pipeline results.
         if static_category_matched and not all_results:
-            print(f"[Search] Static check: category matched but 0 products in DB — returning empty (not falling through to ML)")
             return []
 
         # Deduplicate by product id (keep first occurrence)
@@ -370,12 +370,10 @@ def _try_static_search(rewritten, max_results: int):
                 seen[r.id] = r
 
         final = sorted(seen.values(), key=lambda r: (LABEL_PRIORITY.get(r.relevance_label, 3), -r.relevance_score))[:max_results]
-        print(f"[Search] Static category match: {len(final)} products returned")
         return final
 
     except Exception as e:
         # Never let static search break the normal pipeline
-        print(f"[Search] Static search error (falling through to ML): {e}")
         return None
 
 
@@ -402,11 +400,6 @@ def _run_search_pipeline(
     if esci_query_embedding is None:
         esci_query_embedding = query_embedding
 
-    # Log brand detection — brand is embedded in search_text by query rewriter;
-    # no ILIKE hard filter is used (would over-aggressively exclude results).
-    if filters.get("brand"):
-        print(f"[Search]   Brand slot='{filters['brand']}' — handled via BERT embedding, not SQL filter")
-
     if show_all:
         # Admin mode: fetch every active/approved product so nothing is hidden by
         # the pgvector top-K cap. Similarity is set to 0 (no vector ranking needed).
@@ -420,7 +413,6 @@ def _run_search_pipeline(
             qb = qb.gte("price", filters["price_min"])
         db_rows = qb.execute().data
         candidates = [{**r, "similarity": 0.0, "embedding": []} for r in db_rows]
-        print(f"[Search]   '{search_text}' (show_all): {len(candidates)} total products from DB")
     else:
         # Only price is used as a hard DB filter; brand/color are semantic (BERT)
         has_price_filter = filters.get("price_min") is not None or filters.get("price_max") is not None
@@ -432,7 +424,6 @@ def _run_search_pipeline(
         else:
             raw_candidates = search_similar_products(query_embedding, top_k=max_candidates)
 
-        print(f"[Search]   '{search_text}': {len(raw_candidates)} raw candidates")
 
         if filters.get("price_max") is not None:
             raw_candidates = [c for c in raw_candidates if float(c["price"]) <= filters["price_max"]]
@@ -564,23 +555,12 @@ async def search_products(
     try:
         rewritten = query_rewriter.process(q)
 
-        print(f"[Search] Original query: '{q}'")
-        print(f"[Search] Intents: {rewritten.intents}")
-        print(f"[Search] Slots: {rewritten.slots}")
-        print(f"[Search] Search groups: {len(rewritten.search_groups)}")
-        for i, g in enumerate(rewritten.search_groups):
-            print(f"[Search]   Group {i+1}: '{g.search_text}' | Filters: {g.filters}")
-
         # === STATIC CATEGORY CHECK ===
-        # Check if search groups match hardcoded product categories
-        # (e.g., halal food, lenten food, snacks, summer food)
         static_results = _try_static_search(rewritten, max_results)
         if static_results is not None:
-            # static_results is a list (possibly empty) — always return it without hitting ML.
-            # Empty means the category is recognised but no matching products exist in the DB yet.
             if not show_all:
                 static_results = [r for r in static_results if r.relevance_label != "Irrelevant"]
-            print(f"[Search] ✓ Static match — returning {len(static_results)} products (skipping ML pipeline)")
+            _log(f"[Search] '{q}' → {len(static_results)} products matched")
             return SearchResponse(
                 query=q,
                 total_results=len(static_results),
@@ -592,8 +572,6 @@ async def search_products(
                 applied_filters=_build_applied_filters(rewritten.search_groups),
                 search_groups=[{"search_text": g.search_text, "filters": g.filters} for g in rewritten.search_groups],
             )
-        else:
-            print(f"[Search] ✗ No static match — proceeding to ML pipeline")
 
         if not bert_service._loaded:
             return await _fallback_text_search(q, rewritten, max_results)
@@ -632,7 +610,7 @@ async def search_products(
         final_results = sorted(seen.values(), key=lambda r: (LABEL_PRIORITY.get(r.relevance_label, 3), -r.relevance_score))[:max_results]
         if not show_all:
             final_results = [r for r in final_results if r.relevance_label != "Irrelevant"]
-        print(f"[Search] Final results: {len(final_results)} (from {len(rewritten.search_groups)} group(s))")
+        _log(f"[Search] '{q}' → {len(final_results)} products matched")
 
         return SearchResponse(
             query=q,
@@ -649,7 +627,7 @@ async def search_products(
     except HTTPException:
         raise
     except Exception as e:
-        print(f"[Search] ERROR: {e}")
+        _log(f"[Search] ERROR: {e}")
         traceback.print_exc()
         raise HTTPException(status_code=500, detail=f"Search failed: {str(e)}")
 

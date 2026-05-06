@@ -114,19 +114,19 @@ STATIC_CATEGORIES = {
     "canned":          ["Sardines", "Luncheon Meat", "Meat Loaf", "Corned Beef",
                         "Gardenia Classic White Bread", "Buko Juice"],
 
-    # food: Exact=main dishes; Substitute=bread; Complement=canned goods+snacks; Irrelevant=Raincoat (clothing, not food)
+    # food: Exact=main dishes; Substitute=bread; Complement=canned goods+snacks; Irrelevant=Raincoat+Buko Juice (drink/clothing, not food)
     "food":  ["Beef Rendang", "Tiyula Itum", "Pastil", "Kebab", "Escabeche", "Biko",
-              "Puto Maya", "Binignit", "Buko Juice", "Shawarma", "Satay", "Pate",
+              "Puto Maya", "Binignit", "Shawarma", "Satay", "Pate",
               "Sardines", "Luncheon Meat", "Corned Beef", "Meat Loaf",
               "Gardenia Classic White Bread", "Fudgee Barr", "Skyflakes",
-              "Raincoat"],
+              "Raincoat", "Buko Juice"],
     "foods": ["Beef Rendang", "Tiyula Itum", "Pastil", "Kebab", "Escabeche", "Biko",
-              "Puto Maya", "Binignit", "Buko Juice", "Shawarma", "Satay", "Pate",
+              "Puto Maya", "Binignit", "Shawarma", "Satay", "Pate",
               "Sardines", "Luncheon Meat", "Corned Beef", "Meat Loaf",
               "Gardenia Classic White Bread", "Fudgee Barr", "Skyflakes",
-              "Raincoat"],
+              "Raincoat", "Buko Juice"],
 
-    # Halal / Muslim food: Exact=certified halal dishes; Substitute=Escabeche (fish, not distinctly halal-branded); Complement=Buko Juice (drink, not food)
+    # Halal / Muslim food: Exact=certified halal dishes; Substitute=Escabeche; Irrelevant=Buko Juice (drink, not food)
     "halal food":  ["Beef Rendang", "Tiyula Itum", "Pastil", "Kebab", "Satay", "Pate",
                     "Escabeche", "Buko Juice"],
     "muslim food": ["Beef Rendang", "Tiyula Itum", "Pastil", "Kebab", "Satay", "Pate",
@@ -134,13 +134,15 @@ STATIC_CATEGORIES = {
     "halal":       ["Beef Rendang", "Tiyula Itum", "Pastil", "Kebab", "Satay", "Pate",
                     "Escabeche", "Buko Juice"],
 
-    # Seasonal food: Exact=traditional seasonal dishes; Substitute=Gardenia bread (meal-adjacent); Complement=Sardines/Luncheon Meat (canned, not seasonal cuisine)
+    # Seasonal food: Exact=traditional seasonal dishes; Substitute=Gardenia; Complement=canned; Irrelevant=Buko Juice (drink)
     "seasonal food": ["Beef Rendang", "Tiyula Itum", "Pastil", "Kebab", "Escabeche",
-                      "Biko", "Puto Maya", "Binignit", "Buko Juice", "Shawarma", "Satay", "Pate",
-                      "Sardines", "Luncheon Meat", "Corned Beef", "Gardenia Classic White Bread"],
+                      "Biko", "Puto Maya", "Binignit", "Shawarma", "Satay", "Pate",
+                      "Sardines", "Luncheon Meat", "Corned Beef", "Gardenia Classic White Bread",
+                      "Buko Juice"],
     "season food":   ["Beef Rendang", "Tiyula Itum", "Pastil", "Kebab", "Escabeche",
-                      "Biko", "Puto Maya", "Binignit", "Buko Juice", "Shawarma", "Satay", "Pate",
-                      "Sardines", "Luncheon Meat", "Corned Beef", "Gardenia Classic White Bread"],
+                      "Biko", "Puto Maya", "Binignit", "Shawarma", "Satay", "Pate",
+                      "Sardines", "Luncheon Meat", "Corned Beef", "Gardenia Classic White Bread",
+                      "Buko Juice"],
     #Birthday items
     "birthday items": ["balloon", "party hats", "party poppers", "party decorations", "Lego", "little", "UNO", "HotWheels", "Hot Wheels", "Playing Cards", "balloons","Cake","Candles","candle","Gift Box","gift box","pink dress","pink flower"],
     "Birthday": ["balloon", "party hats", "party poppers", "party decorations", "Lego", "little", "UNO", "HotWheels", "Hot Wheels", "Playing Cards", "balloons","Cake","Candles","candle","Gift Box","gift box","pink dress","pink flower"],
@@ -213,9 +215,11 @@ STATIC_CATEGORIES = {
                    "Mentos", "Twizzlers", "HotWheels"],
     "sweets":     ["M&Ms", "Mentos", "Twizzlers", "sprinkles candy", "Ferrero",
                    "Skyflakes", "HotWheels"],
-    # Drinks: Exact=Buko Juice; Complement=Sardines (food, often paired with a drink)
-    "drinks": ["Buko Juice", "Sardines"],
-    "drink":  ["Buko Juice", "Sardines"],
+    # Drinks / Juice — "Juice" keyword matches any product whose title contains "juice"
+    "drinks": ["Juice"],
+    "drink":  ["Juice"],
+    "juice":  ["Juice"],
+    "juices": ["Juice"],
 
     # ── School Supplies ───────────────────────────────────────────────────────
     # Exact=stationery; Complement=Lego (educational toy, not a school supply); Irrelevant=Sardines (food, nothing to do with school)
@@ -377,9 +381,9 @@ STATIC_ESCI: dict[str, dict] = {
 
     # ── Halal / Muslim food ───────────────────────────────────────────────────
     # Halal dishes = Exact. Escabeche = Substitute (fish, halal but not distinctly halal-branded). Buko Juice = Complement (drink, not a dish).
-    "halal food":  {"substitute": {"Escabeche"}, "complement": {"Buko Juice"}},
-    "muslim food": {"substitute": {"Escabeche"}, "complement": {"Buko Juice"}},
-    "halal":       {"substitute": {"Escabeche"}, "complement": {"Buko Juice"}},
+    "halal food":  {"substitute": {"Escabeche"}, "irrelevant": {"Buko Juice"}},
+    "muslim food": {"substitute": {"Escabeche"}, "irrelevant": {"Buko Juice"}},
+    "halal":       {"substitute": {"Escabeche"}, "irrelevant": {"Buko Juice"}},
 
     # ── Lenten food ───────────────────────────────────────────────────────────
     # Traditional Lenten dishes = Exact. Sardines = Substitute (common fasting protein, canned). Skyflakes = Complement (snack during fasting).
@@ -388,9 +392,11 @@ STATIC_ESCI: dict[str, dict] = {
     "lenten":             {"substitute": {"Sardines"}, "complement": {"Skyflakes"}},
 
     # ── Drinks ───────────────────────────────────────────────────────────────
-    # Buko Juice = Exact. Sardines = Complement (food, not a drink — shown as pairing suggestion).
+    # All juice/drink products = Exact. Sardines = Complement (food pairing).
     "drinks": {"complement": {"Sardines"}},
     "drink":  {"complement": {"Sardines"}},
+    "juice":  {},
+    "juices": {},
 
     # ── Meat / Meats ─────────────────────────────────────────────────────────
     # Fresh/cooked meat dishes = Exact. Luncheon Meat/Meat Loaf = Substitute (processed canned meat, not fresh). Sardines = Complement (canned fish, different protein).
@@ -399,8 +405,8 @@ STATIC_ESCI: dict[str, dict] = {
 
     # ── Food ─────────────────────────────────────────────────────────────────
     # Main dishes = Exact. Gardenia = Substitute. Canned goods/snacks = Complement. Raincoat = Irrelevant (clothing).
-    "food":  {"substitute": {"Gardenia"}, "complement": {"Sardines", "Luncheon Meat", "Corned Beef", "Meat Loaf", "Fudgee Barr", "Skyflakes"}, "irrelevant": {"Raincoat"}},
-    "foods": {"substitute": {"Gardenia"}, "complement": {"Sardines", "Luncheon Meat", "Corned Beef", "Meat Loaf", "Fudgee Barr", "Skyflakes"}, "irrelevant": {"Raincoat"}},
+    "food":  {"substitute": {"Gardenia"}, "complement": {"Sardines", "Luncheon Meat", "Corned Beef", "Meat Loaf", "Fudgee Barr", "Skyflakes"}, "irrelevant": {"Raincoat", "Buko Juice"}},
+    "foods": {"substitute": {"Gardenia"}, "complement": {"Sardines", "Luncheon Meat", "Corned Beef", "Meat Loaf", "Fudgee Barr", "Skyflakes"}, "irrelevant": {"Raincoat", "Buko Juice"}},
 
     # ── Kids food ─────────────────────────────────────────────────────────────
     # Sweet/fun foods (juice, kakanin, snacks, candy) = Exact for kids.
@@ -413,8 +419,8 @@ STATIC_ESCI: dict[str, dict] = {
 
     # ── Seasonal food ────────────────────────────────────────────────────────
     # Seasonal dishes = Exact. Canned goods = Complement (convenient, not seasonal cuisine). Gardenia = Substitute (neutral meal base).
-    "seasonal food": {"substitute": {"Gardenia"}, "complement": {"Sardines", "Luncheon Meat", "Corned Beef", "Meat Loaf"}},
-    "season food":   {"substitute": {"Gardenia"}, "complement": {"Sardines", "Luncheon Meat", "Corned Beef", "Meat Loaf"}},
+    "seasonal food": {"substitute": {"Gardenia"}, "complement": {"Sardines", "Luncheon Meat", "Corned Beef", "Meat Loaf"}, "irrelevant": {"Buko Juice"}},
+    "season food":   {"substitute": {"Gardenia"}, "complement": {"Sardines", "Luncheon Meat", "Corned Beef", "Meat Loaf"}, "irrelevant": {"Buko Juice"}},
 
     # ── Clothes ──────────────────────────────────────────────────────────────
     # Hats/Keffiyeh = Complement (accessories, not clothing per se).

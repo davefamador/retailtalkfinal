@@ -14,10 +14,15 @@ TOKEN = os.getenv("HF_TOKEN") or None
 
 # (hub_filename, local_filename_inside_aimodels)
 FILES = [
-    ("trained_model/pytorch_model.bin",        "pytorch_model.bin"),
-    ("trained_model/ranker/model.safetensors", "model.safetensors"),
-    ("trained_model/intent_classifier/model.pt", "intent_classifier/model.pt"),
-    ("trained_model/slot_extractor/model.pt",    "slot_extractor/model.pt"),
+    ("pytorch_model.bin",        "pytorch_model.bin"),
+    ("ranker/model.safetensors", "ranker/model.safetensors"),
+    ("ranker/config.json",                   "ranker/config.json"),
+    ("ranker/tokenizer.json",                "ranker/tokenizer.json"),
+    ("ranker/tokenizer_config.json",         "ranker/tokenizer_config.json"),
+    ("ranker/special_tokens_map.json",       "ranker/special_tokens_map.json"),
+    ("ranker/vocab.txt",                     "ranker/vocab.txt"),
+    ("intent_classifier/model.pt", "intent_classifier/model.pt"),
+    ("slot_extractor/model.pt",    "slot_extractor/model.pt"),
 ]
 
 # aimodels/ lives next to this file's parent (project root/aimodels)
@@ -46,12 +51,10 @@ def download_models():
                 local_dir_use_symlinks=False,
                 token=TOKEN,
             )
-            # hf_hub_download mirrors the hub path; move to flat name if needed
-            hub_local = os.path.join(AIMODELS_DIR, hub_filename.replace("trained_model/", ""))
-            if not os.path.exists(local_path) and os.path.exists(hub_local):
-                os.makedirs(os.path.dirname(local_path), exist_ok=True)
-                os.rename(hub_local, local_path)
-            print(f"[done] {local_name}")
+            if os.path.exists(local_path):
+                print(f"[done] {local_name}")
+            else:
+                print(f"[warn] {local_name} downloaded but not found at expected path")
         except (RemoteEntryNotFoundError, RepositoryNotFoundError) as e:
             print(f"[miss] {hub_filename} not found on Hub — service will run without it")
 
