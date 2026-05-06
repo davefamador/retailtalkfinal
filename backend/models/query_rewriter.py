@@ -119,6 +119,19 @@ _INTENT_RULES: list[tuple] = [
         re.compile(r'\b(party|birthday|celebration|event|occasion)\b', re.IGNORECASE),
         "snacks",
     ),
+    # ── Toys / birthday — gender-specific (must come before generic birthday toys) ──
+    # "toys for boys birthday" / "boys toys for birthday" → boys birthday toys
+    (
+        re.compile(r'\b(toy|toys|play|playing)\b', re.IGNORECASE),
+        re.compile(r'\b(boy|boys)\b.*\b(birthday|party)\b|\b(birthday|party)\b.*\b(boy|boys)\b', re.IGNORECASE),
+        "boys birthday toys",
+    ),
+    # "toys for girls birthday" / "girls toys for birthday" → girls birthday toys
+    (
+        re.compile(r'\b(toy|toys|play|playing)\b', re.IGNORECASE),
+        re.compile(r'\b(girl|girls)\b.*\b(birthday|party)\b|\b(birthday|party)\b.*\b(girl|girls)\b', re.IGNORECASE),
+        "girls birthday toys",
+    ),
     # ── Toys / birthday ───────────────────────────────────────────────────────
     # "toys in this birthday" / "toys for a birthday party" → birthday toys
     (

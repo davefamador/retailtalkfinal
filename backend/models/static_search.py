@@ -132,6 +132,14 @@ STATIC_CATEGORIES = {
     # Birthday toys — toy-specific gifts for a birthday (no decorations)
     "birthday toys": ["Lego", "little", "UNO", "HotWheels", "Playing Cards", "stuffed toys"],
     "birthday toy":  ["Lego", "little", "UNO", "HotWheels", "Playing Cards", "stuffed toys"],
+    # Boys birthday toys — action/vehicle toys for boys
+    "boys birthday toys":  ["Lego", "HotWheels", "UNO", "Playing Cards", "little"],
+    "boy birthday toys":   ["Lego", "HotWheels", "UNO", "Playing Cards", "little"],
+    "birthday toys for boys": ["Lego", "HotWheels", "UNO", "Playing Cards", "little"],
+    # Girls birthday toys — plush/doll-friendly toys for girls
+    "girls birthday toys":    ["stuffed toys", "UNO", "Playing Cards", "little"],
+    "girl birthday toys":     ["stuffed toys", "UNO", "Playing Cards", "little"],
+    "birthday toys for girls":["stuffed toys", "UNO", "Playing Cards", "little"],
     # Lenten season food
     "lenten season food": ["Escabeche", "Biko", "Puto Maya", "Binignit"],
     "lenten food":        ["Escabeche", "Biko", "Puto Maya", "Binignit"],
@@ -266,6 +274,14 @@ STATIC_ESCI: dict[str, dict] = {
     # Birthday toys — all items are Exact (they are all playable toys)
     "birthday toys": {},
     "birthday toy":  {},
+    # Boys birthday toys — HotWheels/Lego are Exact; UNO/Playing Cards are Substitute (gender-neutral)
+    "boys birthday toys":     {"substitute": {"UNO", "Playing Cards"}},
+    "boy birthday toys":      {"substitute": {"UNO", "Playing Cards"}},
+    "birthday toys for boys": {"substitute": {"UNO", "Playing Cards"}},
+    # Girls birthday toys — stuffed toys are Exact; UNO/Playing Cards are Substitute (gender-neutral)
+    "girls birthday toys":     {"substitute": {"UNO", "Playing Cards"}},
+    "girl birthday toys":      {"substitute": {"UNO", "Playing Cards"}},
+    "birthday toys for girls": {"substitute": {"UNO", "Playing Cards"}},
 
     # ── Party supplies ────────────────────────────────────────────────────────
     # Balloons, banner, party pop = Exact.
