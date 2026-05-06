@@ -16,6 +16,7 @@ class SearchGroup:
     """A single search sub-query with its own text and filters."""
     search_text: str
     filters: dict = field(default_factory=dict)
+    price_is_shared: bool = False  # True when price came from a shared trailing clause
 
 
 @dataclass
@@ -321,28 +322,31 @@ def _merge_rewritten_queries(
 
     # ── Propagate shared price filter to groups that have no price of their own ─
     #
-    # Rule: only propagate a price when the SOURCE group's search_text does NOT
-    # contain a price-modifier word. If the source's text has "less than", "under",
-    # etc. embedded in it, the price was scoped to that product by the user
-    # ("toys less than 100 and clothes" → price stays on toys only).
-    # If the source's text is a clean product name with no modifier (e.g. the price
-    # landed on "toys" after a space-split of "food toys less than 150"), it is a
-    # shared trailing clause and should propagate to all unpriced groups.
-    _PRICE_MODIFIER_RE = re.compile(
-        r'\b(?:less\s+than|under|below|above|over|more\s+than|at\s+(?:most|least)'
-        r'|between|cheaper\s+than|budget|affordable|cheap|pricey|priced|costing|worth)\b',
-        re.IGNORECASE,
+    # Only propagate when the groups came from a space-separated split — NOT from
+    # a conjunction split. "toys less than 100 and clothes" explicitly scopes the
+    # price to toys; "food toys less than 150" has a shared trailing price clause.
+    #
+    # Detection: if the original query contains a conjunction that produced the
+    # split AND at least one group already has a price (meaning the price was
+    # written next to that specific product), do NOT propagate.
+    # Space-separated splits via _split_space_separated_products re-attach the
+    # price to ALL products before _process_single runs, so all groups from that
+    # path already carry the price — propagation is only needed for groups that
+    # came from a conjunction split where one part had the price and another didn't.
+    # But in a conjunction split, the price was explicitly scoped by the user.
+    # Therefore: never propagate when a conjunction appears in the original query.
+    _CONJUNCTION_RE = re.compile(
+        r'\b(?:and|at\s+saka|tapos|tsaka|pati(?:\s+na)?)\b', re.IGNORECASE
     )
+    has_conjunction = bool(_CONJUNCTION_RE.search(original_query))
 
     price_maxes = {g.filters["price_max"] for g in all_groups if "price_max" in g.filters}
     price_mins  = {g.filters["price_min"] for g in all_groups if "price_min" in g.filters}
 
-    if len(price_maxes) == 1:
+    if not has_conjunction and len(price_maxes) == 1:
         shared_max = next(iter(price_maxes))
         source_is_standalone = any(
-            g.filters.get("price_max") == shared_max
-            and "price_min" not in g.filters
-            and not _PRICE_MODIFIER_RE.search(g.search_text)
+            g.filters.get("price_max") == shared_max and "price_min" not in g.filters
             for g in all_groups
         )
         if source_is_standalone:
@@ -351,12 +355,10 @@ def _merge_rewritten_queries(
                     g.filters["price_max"] = shared_max
             print(f"[QueryRewriter] Shared price_max={shared_max} applied to groups with no price")
 
-    if len(price_mins) == 1:
+    if not has_conjunction and len(price_mins) == 1:
         shared_min = next(iter(price_mins))
         source_is_standalone = any(
-            g.filters.get("price_min") == shared_min
-            and "price_max" not in g.filters
-            and not _PRICE_MODIFIER_RE.search(g.search_text)
+            g.filters.get("price_min") == shared_min and "price_max" not in g.filters
             for g in all_groups
         )
         if source_is_standalone:
@@ -366,7 +368,7 @@ def _merge_rewritten_queries(
             print(f"[QueryRewriter] Shared price_min={shared_min} applied to groups with no price")
 
     # ── Propagate a shared between-range to groups with no price at all ───────
-    # Same rule: only when the source group's search_text has no price modifier.
+    # Same conjunction guard.
     between_pairs = {
         (g.filters["price_min"], g.filters["price_max"])
         for g in all_groups
@@ -376,19 +378,12 @@ def _merge_rewritten_queries(
         g for g in all_groups
         if "price_min" not in g.filters and "price_max" not in g.filters
     ]
-    if len(between_pairs) == 1 and unpriceed_groups:
+    if not has_conjunction and len(between_pairs) == 1 and unpriceed_groups:
         shared_pair_min, shared_pair_max = next(iter(between_pairs))
-        source_has_no_modifier = any(
-            g.filters.get("price_min") == shared_pair_min
-            and g.filters.get("price_max") == shared_pair_max
-            and not _PRICE_MODIFIER_RE.search(g.search_text)
-            for g in all_groups
-        )
-        if source_has_no_modifier:
-            for g in unpriceed_groups:
-                g.filters["price_min"] = shared_pair_min
-                g.filters["price_max"] = shared_pair_max
-            print(f"[QueryRewriter] Shared between-range ({shared_pair_min},{shared_pair_max}) applied to {len(unpriceed_groups)} group(s)")
+        for g in unpriceed_groups:
+            g.filters["price_min"] = shared_pair_min
+            g.filters["price_max"] = shared_pair_max
+        print(f"[QueryRewriter] Shared between-range ({shared_pair_min},{shared_pair_max}) applied to {len(unpriceed_groups)} group(s)")
 
     # Union of all intents (deduplicated, preserving order)
     merged_intents = list(dict.fromkeys(
