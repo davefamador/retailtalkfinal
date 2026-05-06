@@ -320,30 +320,29 @@ def _merge_rewritten_queries(
     all_groups = deduped
 
     # ── Propagate shared price filter to groups that have no price of their own ─
-    # When the user writes "food and toys less than 20", splitting produces one
-    # group with price_max=20 and another with none.  Since only a single unique
-    # price value appears across all groups, treat it as a global constraint and
-    # fill it into groups that are missing it.
     #
-    # Crucially: only propagate when the candidate value is a standalone
-    # directional price (i.e. the source group does NOT also have the paired
-    # bound).  A between-range group carries BOTH price_min AND price_max
-    # together — those are tied to that product and must not bleed to others.
-    # Example: "sardine under 30 and halal food between 50 and 80"
-    #   → sardine: {price_max:30}   halal: {price_min:50, price_max:80}
-    #   → price_min=50 must NOT be stamped onto sardine (would make 50≤p≤30 impossible)
+    # Rule: only propagate a price when the SOURCE group's search_text does NOT
+    # contain a price-modifier word. If the source's text has "less than", "under",
+    # etc. embedded in it, the price was scoped to that product by the user
+    # ("toys less than 100 and clothes" → price stays on toys only).
+    # If the source's text is a clean product name with no modifier (e.g. the price
+    # landed on "toys" after a space-split of "food toys less than 150"), it is a
+    # shared trailing clause and should propagate to all unpriced groups.
+    _PRICE_MODIFIER_RE = re.compile(
+        r'\b(?:less\s+than|under|below|above|over|more\s+than|at\s+(?:most|least)'
+        r'|between|cheaper\s+than|budget|affordable|cheap|pricey|priced|costing|worth)\b',
+        re.IGNORECASE,
+    )
+
     price_maxes = {g.filters["price_max"] for g in all_groups if "price_max" in g.filters}
     price_mins  = {g.filters["price_min"] for g in all_groups if "price_min" in g.filters}
 
     if len(price_maxes) == 1:
         shared_max = next(iter(price_maxes))
-        # Only propagate if the source is a standalone max (no paired min) AND
-        # only into target groups that have NO price constraint at all.
-        # Prevents bleeding into groups that already have their own price_min
-        # (e.g. "sardines under 30 and drinks above 50" — drinks must not also
-        # get price_max=30, which would create an impossible range).
         source_is_standalone = any(
-            g.filters.get("price_max") == shared_max and "price_min" not in g.filters
+            g.filters.get("price_max") == shared_max
+            and "price_min" not in g.filters
+            and not _PRICE_MODIFIER_RE.search(g.search_text)
             for g in all_groups
         )
         if source_is_standalone:
@@ -354,9 +353,10 @@ def _merge_rewritten_queries(
 
     if len(price_mins) == 1:
         shared_min = next(iter(price_mins))
-        # Same guard: only into groups with NO price constraint at all.
         source_is_standalone = any(
-            g.filters.get("price_min") == shared_min and "price_max" not in g.filters
+            g.filters.get("price_min") == shared_min
+            and "price_max" not in g.filters
+            and not _PRICE_MODIFIER_RE.search(g.search_text)
             for g in all_groups
         )
         if source_is_standalone:
@@ -366,10 +366,7 @@ def _merge_rewritten_queries(
             print(f"[QueryRewriter] Shared price_min={shared_min} applied to groups with no price")
 
     # ── Propagate a shared between-range to groups with no price at all ───────
-    # Mirrors "food and toys under 20" behaviour but for between-ranges.
-    # "food and toys between 10 and 50" splits into food={} and toys={min,max}.
-    # Since only one unique (min, max) pair exists and at least one group has
-    # no price at all, treat the range as a shared constraint for all.
+    # Same rule: only when the source group's search_text has no price modifier.
     between_pairs = {
         (g.filters["price_min"], g.filters["price_max"])
         for g in all_groups
@@ -381,10 +378,17 @@ def _merge_rewritten_queries(
     ]
     if len(between_pairs) == 1 and unpriceed_groups:
         shared_pair_min, shared_pair_max = next(iter(between_pairs))
-        for g in unpriceed_groups:
-            g.filters["price_min"] = shared_pair_min
-            g.filters["price_max"] = shared_pair_max
-        print(f"[QueryRewriter] Shared between-range ({shared_pair_min},{shared_pair_max}) applied to {len(unpriceed_groups)} group(s)")
+        source_has_no_modifier = any(
+            g.filters.get("price_min") == shared_pair_min
+            and g.filters.get("price_max") == shared_pair_max
+            and not _PRICE_MODIFIER_RE.search(g.search_text)
+            for g in all_groups
+        )
+        if source_has_no_modifier:
+            for g in unpriceed_groups:
+                g.filters["price_min"] = shared_pair_min
+                g.filters["price_max"] = shared_pair_max
+            print(f"[QueryRewriter] Shared between-range ({shared_pair_min},{shared_pair_max}) applied to {len(unpriceed_groups)} group(s)")
 
     # Union of all intents (deduplicated, preserving order)
     merged_intents = list(dict.fromkeys(
