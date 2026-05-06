@@ -153,17 +153,24 @@ _INTENT_RULES: list[tuple] = [
 
 # Price clause pattern — matches trailing or inline price filters so they can
 # be stripped before category matching and re-attached afterwards.
-# Handles: "less than 300 pesos", "under 500", "between 100 and 400", "more than 50"
+# Handles: "less than 300 pesos", "under 500", "between 100 and 400",
+#          "more than 50", "more than 200 and less than 300"
 _PRICE_CLAUSE_RE = re.compile(
-    r'(\s+(?:less\s+than|under|below|at\s+most|cheaper\s+than|more\s+than|above|over|at\s+least)'
-    r'\s+\d+(?:\.\d+)?(?:\s+pesos?|php)?'
+    r'(\s+(?:more\s+than|above|over|at\s+least)\s+\d+(?:\.\d+)?(?:\s+pesos?|php)?\s+and\s+(?:less\s+than|under|below|at\s+most)\s+\d+(?:\.\d+)?(?:\s+pesos?|php)?'
+    r'|\s+(?:less\s+than|under|below|at\s+most)\s+\d+(?:\.\d+)?(?:\s+pesos?|php)?\s+and\s+(?:more\s+than|above|over|at\s+least)\s+\d+(?:\.\d+)?(?:\s+pesos?|php)?'
+    r'|\s+(?:less\s+than|under|below|at\s+most|cheaper\s+than|more\s+than|above|over|at\s+least)\s+\d+(?:\.\d+)?(?:\s+pesos?|php)?'
     r'|\s+between\s+\d+(?:\.\d+)?\s+(?:and|to)\s+\d+(?:\.\d+)?(?:\s+pesos?|php)?)',
     re.IGNORECASE,
 )
 
-# Matches a between-range so we can exclude its "and" from the conjunction guard
+# Matches a between-range OR a dual-direction range so we can exclude its
+# "and" from the conjunction guard.
+# e.g. "between 100 and 400"  OR  "more than 200 and less than 300"
 _BETWEEN_RANGE_RE = re.compile(
-    r'\bbetween\s+\d+(?:\.\d+)?\s+(?:and|to)\s+\d+(?:\.\d+)?', re.IGNORECASE
+    r'\bbetween\s+\d+(?:\.\d+)?\s+(?:and|to)\s+\d+(?:\.\d+)?'
+    r'|(?:more\s+than|above|over|at\s+least)\s+\d+(?:\.\d+)?\s+and\s+(?:less\s+than|under|below|at\s+most)\s+\d+(?:\.\d+)?'
+    r'|(?:less\s+than|under|below|at\s+most)\s+\d+(?:\.\d+)?\s+and\s+(?:more\s+than|above|over|at\s+least)\s+\d+(?:\.\d+)?',
+    re.IGNORECASE
 )
 
 _CONJUNCTION_RE = re.compile(
@@ -260,6 +267,14 @@ def _strip_between_clause(query: str) -> str:
     return _BETWEEN_RE.sub("", query).strip()
 
 
+# Dual-direction price range: "more than X and less than Y" / "under X and above Y"
+_DUAL_DIRECTION_RE = re.compile(
+    r'(?:more\s+than|above|over|at\s+least)\s+\d+(?:\.\d+)?(?:\s+pesos?|php)?\s+and\s+(?:less\s+than|under|below|at\s+most)\s+\d+(?:\.\d+)?(?:\s+pesos?|php)?'
+    r'|(?:less\s+than|under|below|at\s+most)\s+\d+(?:\.\d+)?(?:\s+pesos?|php)?\s+and\s+(?:more\s+than|above|over|at\s+least)\s+\d+(?:\.\d+)?(?:\s+pesos?|php)?',
+    re.IGNORECASE,
+)
+
+
 def split_compound_query(query: str) -> list[str]:
     """
     Split a compound query on conjunctions ('and', 'at saka', etc.)
@@ -274,20 +289,32 @@ def split_compound_query(query: str) -> list[str]:
     "snacks between 20 and 50" — NOT split (between-range guard)
     -> ["snacks between 20 and 50"]
 
+    "dress more than 200 and less than 300" — NOT split (dual-direction guard)
+    -> ["dress more than 200 and less than 300"]
+
     "snacks between 20 and 50 and halal food between 100 and 200"
     -> ["snacks between 20 and 50", "halal food between 100 and 200"]
     """
-    between_matches = list(_BETWEEN_RE.finditer(query))
-    if between_matches:
-        # Replace each between-clause with a placeholder so the "and" inside
-        # the range doesn't get treated as a product conjunction.
-        placeholder_map = {}
-        working = query
-        for i, m in enumerate(reversed(between_matches)):
-            placeholder = f"__BETWEEN{i}__"
-            placeholder_map[placeholder] = m.group(0)
-            working = working[: m.start()] + placeholder + working[m.end() :]
+    # Replace price range clauses with placeholders so their internal "and"
+    # is never mistaken for a product conjunction.
+    placeholder_map = {}
+    working = query
 
+    # Guard dual-direction ranges first (they also contain "and")
+    dual_matches = list(_DUAL_DIRECTION_RE.finditer(working))
+    for i, m in enumerate(reversed(dual_matches)):
+        placeholder = f"__DUAL{i}__"
+        placeholder_map[placeholder] = m.group(0)
+        working = working[: m.start()] + placeholder + working[m.end():]
+
+    # Guard between-ranges
+    between_matches = list(_BETWEEN_RE.finditer(working))
+    for i, m in enumerate(reversed(between_matches)):
+        placeholder = f"__BETWEEN{i}__"
+        placeholder_map[placeholder] = m.group(0)
+        working = working[: m.start()] + placeholder + working[m.end():]
+
+    if placeholder_map:
         # Now split the placeholder-substituted string on conjunctions
         split_parts = [working]
         for conj in COMPOUND_CONJUNCTIONS:
