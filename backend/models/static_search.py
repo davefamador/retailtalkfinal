@@ -116,7 +116,14 @@ STATIC_CATEGORIES = {
                       "Biko", "Puto Maya", "Binignit", "Buko Juice", "Shawarma", "Satay", "Pate"],
     "season food":   ["Beef Rendang", "Tiyula Itum", "Pastil", "Kebab", "Escabeche",
                       "Biko", "Puto Maya", "Binignit", "Buko Juice", "Shawarma", "Satay", "Pate"],
-
+    #Birthday items
+    "birthday items": ["balloon", "party hats", "party poppers", "party decorations", "Lego", "little", "UNO", "HotWheels", "Playing Cards", "balloons","Cake","Candles","candle","Gift Box","gift box","pink dress","pink flower","hot wheels","hotwheels"],
+    "Birthday": ["balloon", "party hats", "party poppers", "party decorations", "Lego", "little", "UNO", "HotWheels", "Playing Cards", "balloons","Cake","Candles","candle","Gift Box","gift box","pink dress","pink flower","hot wheels","hotwheels"],
+    "birthdays": ["balloon", "party hats", "party poppers", "party decorations", "Lego", "little", "UNO", "HotWheels", "Playing Cards", "balloons","Cake","Candles","candle","Gift Box","gift box","pink dress","pink flower","hot wheels","hotwheels"],
+    "Birthday items for girls": ["balloon", "party hats", "party poppers", "party decorations", "Lego", "little", "UNO", "HotWheels", "Playing Cards", "balloons","pink dress","pink flower","Gift Box","gift box"],
+    "Birthday items for boys": ["balloon", "party hats", "party poppers", "party decorations", "Lego", "little", "UNO", "HotWheels", "Playing Cards", "balloons","blue shirt","Gift Box","gift box"],
+    "Birthday items for kids": ["balloon", "party hats", "party poppers", "party decorations", "Lego", "little", "UNO", "HotWheels", "Playing Cards", "balloons","pink dress","blue shirt","pink flower","Gift Box","gift box"],
+    "Birthday items for adults": ["balloon", "party hats", "party poppers", "party decorations", "Lego", "little", "UNO", "HotWheels", "Playing Cards", "balloons","Gift Box","gift box"],
     # Lenten season food
     "lenten season food": ["Escabeche", "Biko", "Puto Maya", "Binignit"],
     "lenten food":        ["Escabeche", "Biko", "Puto Maya", "Binignit"],
@@ -125,7 +132,9 @@ STATIC_CATEGORIES = {
     # Snacks
     "snacks": ["Marty's Cracklin", "Fudgee Barr", "Nagaraya", "Boy Bawang", "Oishi Prawn Crackers", "Skyflakes"],
     "snack":  ["Marty's Cracklin", "Fudgee Barr", "Nagaraya", "Boy Bawang", "Oishi Prawn Crackers", "Skyflakes"],
-
+    "candy":  ["M&M's Milk Chocolate", "Gummy worms", "chocolates", "gummies"],
+    "chocolates": ["M&M's Milk Chocolate", "chocolates", "gummies"],
+    "sweets": ["M&M's Milk Chocolate", "Gummy worms", "chocolates", "gummies"],
     # Drinks
     "drinks": ["Buko Juice"],
     "drink":  ["Buko Juice"],
@@ -133,11 +142,15 @@ STATIC_CATEGORIES = {
     # ── School Supplies ───────────────────────────────────────────────────────
     "school supplies": ["notebook", "pen", "pencil", "eraser", "ruler"],
     "school":          ["notebook", "pen", "pencil", "eraser", "ruler"],
-
+    
     # ── Toys ─────────────────────────────────────────────────────────────────
-    "toys":     ["Lego"],
-    "toy":      ["Lego"],
-    "for kids": ["Lego"],
+    "toys":     ["Lego","little","UNO","HotWheels","Playing Cards","balloons","stuffed toys"],
+    "toy":      ["Lego","little","UNO","HotWheels","Playing Cards","balloons","stuffed toys"],
+    "for kids": ["Lego","little","UNO","HotWheels","Playing Cards","balloons","stuffed toys"],
+    "balloon": ["balloon"],
+    "balloons": ["balloon"],
+    "party needs": ["balloon", "party hats", "party poppers", "party decorations"],
+    "party supplies": ["balloon", "party hats", "party poppers", "party decorations"],
 
     # ── Clothing — all ───────────────────────────────────────────────────────
     "clothes":   ["Raincoat", "Rain Boots", "Waterproof Jacket", "shorts", "flip flops",
