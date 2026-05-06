@@ -396,7 +396,7 @@ def _run_search_pipeline(
         if filters.get("price_min") is not None:
             qb = qb.gte("price", filters["price_min"])
         db_rows = qb.execute().data
-        candidates = [{**r, "similarity": 0.0, "embedding": r.get("embedding") or []} for r in db_rows]
+        candidates = [{**r, "similarity": 0.0, "embedding": r.get("embedding") if r.get("embedding") is not None else []} for r in db_rows]
         print(f"[Search]   '{search_text}' (show_all): {len(candidates)} total products from DB")
     else:
         # Only price is used as a hard DB filter; brand/color are semantic (BERT)
