@@ -210,6 +210,95 @@ FOOD_COMPLEMENT_TITLES: set[str] = {"Sardines", "Luncheon Meat", "Corned Beef", 
 # Titles that appear in the "meat/meats" category but are canned — shown as Complement
 MEAT_COMPLEMENT_TITLES: set[str] = {"Luncheon Meat", "Meat Loaf"}
 
+# =============================================================================
+#  Per-category ESCI overrides
+#  Keys match the lowercased query strings from STATIC_CATEGORIES.
+#  Each value has optional "complement" and "substitute" keyword sets.
+#  Any title that contains a complement keyword → Complement label.
+#  Any title that contains a substitute keyword → Substitute label.
+#  Remaining titles → Exact (the default).
+# =============================================================================
+STATIC_ESCI: dict[str, dict] = {
+
+    # ── Candy / Sweets ────────────────────────────────────────────────────────
+    # Ferrero Rocher is a gift chocolate box — Substitute for plain candy.
+    # M&Ms, Mentos, Twizzlers, SOFT candy are direct candy → Exact.
+    "candy":      {"substitute": {"Ferrero"}},
+    "candies":    {"substitute": {"Ferrero"}},
+    "sweets":     {"substitute": {"Ferrero"}},
+    # Chocolates query: M&Ms is Exact, Ferrero Rocher is also Exact (it IS chocolate).
+    # Mentos / Twizzlers are candy but not really chocolate → Substitute.
+    "chocolates": {"substitute": {"Mentos", "Twizzlers", "sprinkles"}},
+    "chocolate":  {"substitute": {"Mentos", "Twizzlers", "sprinkles"}},
+
+    # ── Snacks ────────────────────────────────────────────────────────────────
+    # All snack items are Exact for "snacks". Candy/sweets are Complement.
+    "snacks": {"complement": {"M&Ms", "Mentos", "Twizzlers", "Ferrero"}},
+    "snack":  {"complement": {"M&Ms", "Mentos", "Twizzlers", "Ferrero"}},
+
+    # ── Birthday ──────────────────────────────────────────────────────────────
+    # Balloons, banner, party pop = Exact birthday items.
+    # Toys (LEGO, UNO, Hot Wheels) = Complement (nice gift, not a birthday decoration).
+    # Ferrero = Complement (gift food, not a birthday decoration).
+    # Slap Bracelets = Substitute (party favour alternative).
+    "birthday items":           {"complement": {"LEGO", "Hot Wheels", "UNO", "Ferrero"},
+                                  "substitute": {"Slap Bracelets"}},
+    "birthday":                 {"complement": {"LEGO", "Hot Wheels", "UNO", "Ferrero"},
+                                  "substitute": {"Slap Bracelets"}},
+    "birthdays":                {"complement": {"LEGO", "Hot Wheels", "UNO", "Ferrero"},
+                                  "substitute": {"Slap Bracelets"}},
+    "birthday items for girls": {"complement": {"Ferrero"},
+                                  "substitute": {"Slap Bracelets"}},
+    "birthday items for boys":  {"complement": {"LEGO", "Hot Wheels", "UNO"}},
+    "birthday items for kids":  {"complement": {"LEGO", "Hot Wheels", "UNO"},
+                                  "substitute": {"Slap Bracelets"}},
+    "birthday items for adults": {"complement": {"Ferrero"}},
+
+    # ── Toys ─────────────────────────────────────────────────────────────────
+    # LEGO, UNO, Hot Wheels = Exact toys.
+    # Balloons = Complement (party/play, not a toy per se).
+    "toys":     {"complement": {"balloon", "Balloons"}},
+    "toy":      {"complement": {"balloon", "Balloons"}},
+    "for kids": {"complement": {"balloon", "Balloons"}},
+
+    # ── Party supplies ────────────────────────────────────────────────────────
+    # Balloons, banner, party pop = Exact.
+    # Toys are Complement at a party (gift, not a supply).
+    "party needs":    {"complement": {"LEGO", "Hot Wheels", "UNO", "Ferrero"}},
+    "party supplies": {"complement": {"LEGO", "Hot Wheels", "UNO", "Ferrero"}},
+
+    # ── School supplies ───────────────────────────────────────────────────────
+    # All items are Exact for "school" / "school supplies".
+    # No complements or substitutes needed.
+
+    # ── Halal / Muslim food ───────────────────────────────────────────────────
+    # All items are Exact (they are halal by definition in the category).
+
+    # ── Canned goods ─────────────────────────────────────────────────────────
+    # All items are Exact for "canned goods".
+
+    # ── Lenten food ───────────────────────────────────────────────────────────
+    # All items are Exact.
+
+    # ── Seasonal food ────────────────────────────────────────────────────────
+    # Canned goods appear as Complement in seasonal food (convenient, not seasonal cuisine).
+    "seasonal food": {"complement": {"Sardines", "Luncheon Meat", "Corned Beef", "Meat Loaf"}},
+    "season food":   {"complement": {"Sardines", "Luncheon Meat", "Corned Beef", "Meat Loaf"}},
+
+    # ── Clothes ──────────────────────────────────────────────────────────────
+    # Hats/accessories = Complement for generic "clothes" searches.
+    "clothes":   {"complement": {"Summer Hat", "Hat", "Keffiyeh"}},
+    "clothing":  {"complement": {"Summer Hat", "Hat", "Keffiyeh"}},
+    "clothings": {"complement": {"Summer Hat", "Hat", "Keffiyeh"}},
+
+    # Rainy season: Raincoat/Rain Boots/Waterproof Jacket = Exact.
+    # No complements needed (list is already precise).
+
+    # Summer clothes: shorts/flip flops/shirt = Exact. Hat = Complement (accessory).
+    "summer clothes": {"complement": {"Summer Hat", "Hat"}},
+    "summer":         {"complement": {"Summer Hat", "Hat"}},
+}
+
 # Summer food = seasonal food EXCLUDING sardines, luncheon meat, canned goods, and snacks
 SUMMER_FOOD_TITLES = [
     "Beef Rendang", "Biko", "Binignit", "Buko Juice", "Escabeche",
@@ -240,11 +329,8 @@ def match_static_category(search_text: str) -> list[str] | None:
     """
     Check if a search text matches a static product category.
 
-    Args:
-        search_text: The cleaned/rewritten search text.
-
     Returns:
-        List of product titles if matched, None if no static match found.
+        List of product title keywords if matched, None if no static match found.
     """
     normalized = search_text.lower().strip()
 
@@ -255,3 +341,14 @@ def match_static_category(search_text: str) -> list[str] | None:
         return list(_STATIC_CATEGORIES_LOWER[normalized])
 
     return None
+
+
+def get_static_esci(search_text: str) -> tuple[set[str], set[str]]:
+    """
+    Return (complement_keywords, substitute_keywords) for a static category query.
+    A product title is checked via case-insensitive substring match against each keyword.
+    Returns empty sets (all Exact) if no override is defined for the category.
+    """
+    normalized = search_text.lower().strip()
+    overrides = STATIC_ESCI.get(normalized, {})
+    return overrides.get("complement", set()), overrides.get("substitute", set())

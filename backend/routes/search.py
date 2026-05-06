@@ -54,7 +54,7 @@ from models.bert_service import bert_service
 from models.classifier import classifier_service, LABEL_PRIORITY
 from models.ranker import ranker_service
 from models.query_rewriter import query_rewriter
-from models.static_search import match_static_category, FOOD_COMPLEMENT_TITLES, MEAT_COMPLEMENT_TITLES
+from models.static_search import match_static_category, get_static_esci, FOOD_COMPLEMENT_TITLES, MEAT_COMPLEMENT_TITLES
 from database import search_similar_products, search_similar_products_filtered, get_supabase
 from config import (
     SEARCH_TOP_K_CANDIDATES,
@@ -198,6 +198,7 @@ def _fetch_static_products(
     titles: list[str],
     filters: dict,
     complement_titles: set[str] | None = None,
+    substitute_titles: set[str] | None = None,
 ) -> list[SearchResultItem]:
     """
     Fetch products by exact title from the database for static category matches.
@@ -210,6 +211,7 @@ def _fetch_static_products(
     import hashlib
 
     complement_titles = complement_titles or set()
+    substitute_titles = substitute_titles or set()
 
     sb = get_supabase()
     ilike_filter = ",".join(f"title.ilike.%{t}%" for t in titles)
@@ -231,28 +233,38 @@ def _fetch_static_products(
         seed = int(hashlib.md5(str(p["id"]).encode()).hexdigest(), 16) % 1000
         jitter = seed / 1000 * 0.06  # 0.00 – 0.06
 
-        is_complement = any(
-            ct.lower() in p["title"].lower() for ct in complement_titles
-        )
+        title_lower = p["title"].lower()
+        is_complement = any(ct.lower() in title_lower for ct in complement_titles)
+        is_substitute = not is_complement and any(st.lower() in title_lower for st in substitute_titles)
 
         if is_complement:
-            similarity   = round(0.72 + jitter * 0.5, 4)   # 0.72 – 0.75
-            ranker_score = round(0.68 + jitter * 0.4, 4)   # 0.68 – 0.70
-            comp_prob    = round(0.78 + jitter * 0.6, 4)   # 0.78 – 0.82
-            exact_prob   = round(0.10 - jitter * 0.2, 4)   # 0.10 – 0.09
-            sub_prob     = round(0.07 - jitter * 0.2, 4)   # 0.07 – 0.06
+            similarity   = round(0.72 + jitter * 0.5, 4)
+            ranker_score = round(0.68 + jitter * 0.4, 4)
+            comp_prob    = round(0.78 + jitter * 0.6, 4)
+            exact_prob   = round(0.10 - jitter * 0.2, 4)
+            sub_prob     = round(0.07 - jitter * 0.2, 4)
             irr_prob     = round(max(0.0, 1.0 - comp_prob - exact_prob - sub_prob), 4)
-            esci_weight  = 0.33  # Complement → weight 0.33
+            esci_weight  = 0.33
             label        = "Complement"
             confidence   = comp_prob
+        elif is_substitute:
+            similarity   = round(0.79 + jitter * 0.5, 4)   # 0.79 – 0.82
+            ranker_score = round(0.75 + jitter * 0.4, 4)   # 0.75 – 0.77
+            sub_prob     = round(0.72 + jitter * 0.6, 4)   # 0.72 – 0.76
+            exact_prob   = round(0.14 - jitter * 0.2, 4)   # 0.14 – 0.13
+            comp_prob    = round(0.08 - jitter * 0.2, 4)   # 0.08 – 0.07
+            irr_prob     = round(max(0.0, 1.0 - sub_prob - exact_prob - comp_prob), 4)
+            esci_weight  = 0.67
+            label        = "Substitute"
+            confidence   = sub_prob
         else:
-            similarity   = round(0.88 + jitter * 0.5, 4)   # 0.88 – 0.91
-            ranker_score = round(0.91 + jitter * 0.4, 4)   # 0.91 – 0.93
-            exact_prob   = round(0.84 + jitter * 0.6, 4)   # 0.84 – 0.88
-            sub_prob     = round(0.06 - jitter * 0.3, 4)   # 0.06 – 0.04
-            comp_prob    = round(0.05 - jitter * 0.2, 4)   # 0.05 – 0.04
+            similarity   = round(0.88 + jitter * 0.5, 4)
+            ranker_score = round(0.91 + jitter * 0.4, 4)
+            exact_prob   = round(0.84 + jitter * 0.6, 4)
+            sub_prob     = round(0.06 - jitter * 0.3, 4)
+            comp_prob    = round(0.05 - jitter * 0.2, 4)
             irr_prob     = round(max(0.0, 1.0 - exact_prob - sub_prob - comp_prob), 4)
-            esci_weight  = 1.0   # Exact → weight 1.0
+            esci_weight  = 1.0
             label        = "Exact"
             confidence   = exact_prob
 
@@ -310,15 +322,16 @@ def _try_static_search(rewritten, max_results: int):
                 return None
             static_category_matched = True
             print(f"[Search] Static check: group {i+1} '{group.search_text}' → matched {len(titles)} titles")
-            # Assign Complement label for canned goods within broad food/meat queries
+            # Resolve ESCI labels: start with hardcoded food/meat overrides,
+            # then fall back to per-category STATIC_ESCI overrides.
             key = group.search_text.lower()
             if key in ("food", "foods"):
-                comp = FOOD_COMPLEMENT_TITLES
+                comp, sub = FOOD_COMPLEMENT_TITLES, set()
             elif key in ("meat", "meats"):
-                comp = MEAT_COMPLEMENT_TITLES
+                comp, sub = MEAT_COMPLEMENT_TITLES, set()
             else:
-                comp = None
-            group_results = _fetch_static_products(titles, group.filters, complement_titles=comp)
+                comp, sub = get_static_esci(group.search_text)
+            group_results = _fetch_static_products(titles, group.filters, complement_titles=comp, substitute_titles=sub)
             print(f"[Search] Static check: group {i+1} → {len(group_results)} products found in DB (out of {len(titles)} in static list)")
             all_results.extend(group_results[:per_group_limit])
 
