@@ -54,7 +54,7 @@ from models.bert_service import bert_service
 from models.classifier import classifier_service, LABEL_PRIORITY
 from models.ranker import ranker_service
 from models.query_rewriter import query_rewriter
-from models.static_search import match_static_category, get_static_esci, FOOD_COMPLEMENT_TITLES, MEAT_COMPLEMENT_TITLES
+from models.static_search import match_static_category, get_static_esci
 from database import search_similar_products, search_similar_products_filtered, get_supabase
 from config import (
     SEARCH_TOP_K_CANDIDATES,
@@ -207,19 +207,20 @@ def _fetch_static_products(
     filters: dict,
     complement_titles: set[str] | None = None,
     substitute_titles: set[str] | None = None,
+    irrelevant_titles: set[str] | None = None,
 ) -> list[SearchResultItem]:
     """
     Fetch products by exact title from the database for static category matches.
     Applies price filters and returns SearchResultItems with realistic scores
     that reflect strong-but-not-perfect exact matches (same range as the ML pipeline).
 
-    Products whose title appears in `complement_titles` are labelled Complement
-    instead of Exact, with scores adjusted accordingly.
+    Label priority: Irrelevant > Substitute > Complement > Exact (default).
     """
     import hashlib
 
     complement_titles = complement_titles or set()
     substitute_titles = substitute_titles or set()
+    irrelevant_titles = irrelevant_titles or set()
 
     sb = get_supabase()
     ilike_filter = ",".join(f"title.ilike.%{t}%" for t in titles)
@@ -238,9 +239,6 @@ def _fetch_static_products(
     response = qb.execute()
     results = []
     for p in response.data:
-        # Two hash-derived noise streams per product so different score
-        # components vary independently — gives more realistic-looking ESCI
-        # distributions instead of every Exact product clustering at ~92%.
         # Hash by title so identical products always share the same ESCI scores
         # regardless of how many rows exist in the DB for the same product name.
         h = hashlib.md5(p["title"].lower().encode()).hexdigest()
@@ -249,10 +247,22 @@ def _fetch_static_products(
         n3 = int(h[16:24],16) / 0xFFFFFFFF  # 0.0 – 1.0
 
         title_lower = p["title"].lower()
-        is_complement = any(ct.lower() in title_lower for ct in complement_titles)
-        is_substitute = not is_complement and any(st.lower() in title_lower for st in substitute_titles)
+        is_irrelevant = any(k.lower() in title_lower for k in irrelevant_titles)
+        is_substitute = not is_irrelevant and any(k.lower() in title_lower for k in substitute_titles)
+        is_complement = not is_irrelevant and not is_substitute and any(k.lower() in title_lower for k in complement_titles)
 
-        if is_complement:
+        if is_irrelevant:
+            # Irrelevant: very low scores, high irrelevant probability
+            similarity   = round(0.20 + n1 * 0.18, 4)        # 0.20 – 0.38
+            ranker_score = round(0.18 + n2 * 0.18, 4)        # 0.18 – 0.36
+            irr_prob     = round(0.72 + n3 * 0.22, 4)        # 0.72 – 0.94
+            exact_prob   = round(0.03 + n1 * 0.06, 4)        # 0.03 – 0.09
+            sub_prob     = round(0.02 + n2 * 0.05, 4)        # 0.02 – 0.07
+            comp_prob    = round(max(0.0, 1.0 - irr_prob - exact_prob - sub_prob), 4)
+            esci_weight  = 0.0
+            label        = "Irrelevant"
+            confidence   = irr_prob
+        elif is_complement:
             # Complement: confidence band ~0.55 – 0.78 (varied)
             similarity   = round(0.62 + n1 * 0.20, 4)        # 0.62 – 0.82
             ranker_score = round(0.58 + n2 * 0.22, 4)        # 0.58 – 0.80
@@ -342,14 +352,8 @@ def _try_static_search(rewritten, max_results: int):
             print(f"[Search] Static check: group {i+1} '{group.search_text}' → matched {len(titles)} titles")
             # Resolve ESCI labels: start with hardcoded food/meat overrides,
             # then fall back to per-category STATIC_ESCI overrides.
-            key = group.search_text.lower()
-            if key in ("food", "foods"):
-                comp, sub = FOOD_COMPLEMENT_TITLES, set()
-            elif key in ("meat", "meats"):
-                comp, sub = MEAT_COMPLEMENT_TITLES, set()
-            else:
-                comp, sub = get_static_esci(group.search_text)
-            group_results = _fetch_static_products(titles, group.filters, complement_titles=comp, substitute_titles=sub)
+            comp, sub, irr = get_static_esci(group.search_text)
+            group_results = _fetch_static_products(titles, group.filters, complement_titles=comp, substitute_titles=sub, irrelevant_titles=irr)
             print(f"[Search] Static check: group {i+1} → {len(group_results)} products found in DB (out of {len(titles)} in static list)")
             all_results.extend(group_results[:per_group_limit])
 
@@ -574,6 +578,8 @@ async def search_products(
         if static_results is not None:
             # static_results is a list (possibly empty) — always return it without hitting ML.
             # Empty means the category is recognised but no matching products exist in the DB yet.
+            if not show_all:
+                static_results = [r for r in static_results if r.relevance_label != "Irrelevant"]
             print(f"[Search] ✓ Static match — returning {len(static_results)} products (skipping ML pipeline)")
             return SearchResponse(
                 query=q,
@@ -624,6 +630,8 @@ async def search_products(
                 seen[r.id] = r
 
         final_results = sorted(seen.values(), key=lambda r: (LABEL_PRIORITY.get(r.relevance_label, 3), -r.relevance_score))[:max_results]
+        if not show_all:
+            final_results = [r for r in final_results if r.relevance_label != "Irrelevant"]
         print(f"[Search] Final results: {len(final_results)} (from {len(rewritten.search_groups)} group(s))")
 
         return SearchResponse(

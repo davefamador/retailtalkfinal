@@ -113,6 +113,12 @@ _INTENT_RULES: list[tuple] = [
         re.compile(r'\b(dry|hot)\b', re.IGNORECASE),
         "seasonal food",
     ),
+    # ── Kids food ────────────────────────────────────────────────────────────
+    (
+        re.compile(r'\b(eat|eating|food|foods|meal|meals|snack|snacks)\b', re.IGNORECASE),
+        re.compile(r'\b(kid|kids|child|children|toddler|toddlers|baby|babies)\b', re.IGNORECASE),
+        "kids food",
+    ),
     # ── Snacks + season / occasion ────────────────────────────────────────────
     (
         re.compile(r'\b(snack|snacks|munch|munching|junk|chips)\b', re.IGNORECASE),

@@ -1,4 +1,5 @@
 """
+you must have pip install hf before doing this thing
 Downloads model weights from HuggingFace Model Hub into the aimodels/ folder.
 Runs automatically on startup if any file is missing.
 Skips files that already exist — safe to call on every restart.

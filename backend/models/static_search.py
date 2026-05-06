@@ -58,6 +58,9 @@ STATIC_CATEGORIES = {
     "eraser":                   ["eraser"],
     "ruler":                    ["ruler"],
     "lego":                     ["Lego"],
+    "hotwheels":                ["HotWheels"],
+    "hot wheels":               ["HotWheels"],
+    "hot wheel":                ["HotWheels"],
     "m&ms":                     ["M&Ms"],
     "mentos":                   ["Mentos"],
     "twizzlers":                ["Twizzlers"],
@@ -97,74 +100,138 @@ STATIC_CATEGORIES = {
     "meat":  ["Beef Rendang", "Tiyula Itum", "Pastil", "Kebab", "Satay", "Pate", "Luncheon Meat", "Meat Loaf"],
     "meats": ["Beef Rendang", "Tiyula Itum", "Pastil", "Kebab", "Satay", "Pate", "Luncheon Meat", "Meat Loaf"],
 
-    "canned goods":    ["Sardines", "Luncheon Meat", "Meat Loaf", "Corned Beef"],
-    "canned good":     ["Sardines", "Luncheon Meat", "Meat Loaf", "Corned Beef"],
-    "canned products": ["Sardines", "Luncheon Meat", "Meat Loaf", "Corned Beef"],
-    "canned product":  ["Sardines", "Luncheon Meat", "Meat Loaf", "Corned Beef"],
-    "canned food":     ["Sardines", "Luncheon Meat", "Meat Loaf", "Corned Beef"],
-    "canned":          ["Sardines", "Luncheon Meat", "Meat Loaf", "Corned Beef"],
+    # Canned goods: Exact=canned meats/fish; Complement=Gardenia bread (go-together with canned goods); Substitute=Buko Juice (drink, not canned meal)
+    "canned goods":    ["Sardines", "Luncheon Meat", "Meat Loaf", "Corned Beef",
+                        "Gardenia Classic White Bread", "Buko Juice"],
+    "canned good":     ["Sardines", "Luncheon Meat", "Meat Loaf", "Corned Beef",
+                        "Gardenia Classic White Bread", "Buko Juice"],
+    "canned products": ["Sardines", "Luncheon Meat", "Meat Loaf", "Corned Beef",
+                        "Gardenia Classic White Bread", "Buko Juice"],
+    "canned product":  ["Sardines", "Luncheon Meat", "Meat Loaf", "Corned Beef",
+                        "Gardenia Classic White Bread", "Buko Juice"],
+    "canned food":     ["Sardines", "Luncheon Meat", "Meat Loaf", "Corned Beef",
+                        "Gardenia Classic White Bread", "Buko Juice"],
+    "canned":          ["Sardines", "Luncheon Meat", "Meat Loaf", "Corned Beef",
+                        "Gardenia Classic White Bread", "Buko Juice"],
 
+    # food: Exact=main dishes; Substitute=bread; Complement=canned goods+snacks; Irrelevant=Raincoat (clothing, not food)
     "food":  ["Beef Rendang", "Tiyula Itum", "Pastil", "Kebab", "Escabeche", "Biko",
               "Puto Maya", "Binignit", "Buko Juice", "Shawarma", "Satay", "Pate",
-              "Sardines", "Luncheon Meat", "Corned Beef", "Meat Loaf"],
+              "Sardines", "Luncheon Meat", "Corned Beef", "Meat Loaf",
+              "Gardenia Classic White Bread", "Fudgee Barr", "Skyflakes",
+              "Raincoat"],
     "foods": ["Beef Rendang", "Tiyula Itum", "Pastil", "Kebab", "Escabeche", "Biko",
               "Puto Maya", "Binignit", "Buko Juice", "Shawarma", "Satay", "Pate",
-              "Sardines", "Luncheon Meat", "Corned Beef", "Meat Loaf"],
+              "Sardines", "Luncheon Meat", "Corned Beef", "Meat Loaf",
+              "Gardenia Classic White Bread", "Fudgee Barr", "Skyflakes",
+              "Raincoat"],
 
-    # Halal / Muslim food
-    "halal food":  ["Beef Rendang", "Tiyula Itum", "Pastil", "Kebab", "Satay", "Pate"],
-    "muslim food": ["Beef Rendang", "Tiyula Itum", "Pastil", "Kebab", "Satay", "Pate"],
-    "halal":       ["Beef Rendang", "Tiyula Itum", "Pastil", "Kebab", "Satay", "Pate"],
+    # Halal / Muslim food: Exact=certified halal dishes; Substitute=Escabeche (fish, not distinctly halal-branded); Complement=Buko Juice (drink, not food)
+    "halal food":  ["Beef Rendang", "Tiyula Itum", "Pastil", "Kebab", "Satay", "Pate",
+                    "Escabeche", "Buko Juice"],
+    "muslim food": ["Beef Rendang", "Tiyula Itum", "Pastil", "Kebab", "Satay", "Pate",
+                    "Escabeche", "Buko Juice"],
+    "halal":       ["Beef Rendang", "Tiyula Itum", "Pastil", "Kebab", "Satay", "Pate",
+                    "Escabeche", "Buko Juice"],
 
-    # Seasonal food (all seasonal products)
+    # Seasonal food: Exact=traditional seasonal dishes; Substitute=Gardenia bread (meal-adjacent); Complement=Sardines/Luncheon Meat (canned, not seasonal cuisine)
     "seasonal food": ["Beef Rendang", "Tiyula Itum", "Pastil", "Kebab", "Escabeche",
-                      "Biko", "Puto Maya", "Binignit", "Buko Juice", "Shawarma", "Satay", "Pate"],
+                      "Biko", "Puto Maya", "Binignit", "Buko Juice", "Shawarma", "Satay", "Pate",
+                      "Sardines", "Luncheon Meat", "Corned Beef", "Gardenia Classic White Bread"],
     "season food":   ["Beef Rendang", "Tiyula Itum", "Pastil", "Kebab", "Escabeche",
-                      "Biko", "Puto Maya", "Binignit", "Buko Juice", "Shawarma", "Satay", "Pate"],
+                      "Biko", "Puto Maya", "Binignit", "Buko Juice", "Shawarma", "Satay", "Pate",
+                      "Sardines", "Luncheon Meat", "Corned Beef", "Gardenia Classic White Bread"],
     #Birthday items
-    "birthday items": ["balloon", "party hats", "party poppers", "party decorations", "Lego", "little", "UNO", "HotWheels", "Playing Cards", "balloons","Cake","Candles","candle","Gift Box","gift box","pink dress","pink flower","hot wheels","hotwheels"],
-    "Birthday": ["balloon", "party hats", "party poppers", "party decorations", "Lego", "little", "UNO", "HotWheels", "Playing Cards", "balloons","Cake","Candles","candle","Gift Box","gift box","pink dress","pink flower","hot wheels","hotwheels"],
-    "birthdays": ["balloon", "party hats", "party poppers", "party decorations", "Lego", "little", "UNO", "HotWheels", "Playing Cards", "balloons","Cake","Candles","candle","Gift Box","gift box","pink dress","pink flower","hot wheels","hotwheels"],
-    "Birthday items for girls": ["balloon", "party hats", "party poppers", "party decorations", "Lego", "little", "UNO", "HotWheels", "Playing Cards", "balloons","pink dress","pink flower","Gift Box","gift box"],
-    "Birthday items for boys": ["balloon", "party hats", "party poppers", "party decorations", "Lego", "little", "UNO", "HotWheels", "Playing Cards", "balloons","blue shirt","Gift Box","gift box"],
-    "Birthday items for kids": ["balloon", "party hats", "party poppers", "party decorations", "Lego", "little", "UNO", "HotWheels", "Playing Cards", "balloons","pink dress","blue shirt","pink flower","Gift Box","gift box"],
-    "Birthday items for adults": ["balloon", "party hats", "party poppers", "party decorations", "Lego", "little", "UNO", "HotWheels", "Playing Cards", "balloons","Gift Box","gift box"],
-    # Birthday toys — toy-specific gifts for a birthday (no decorations)
-    "birthday toys": ["Lego", "little", "UNO", "HotWheels", "Playing Cards", "stuffed toys"],
-    "birthday toy":  ["Lego", "little", "UNO", "HotWheels", "Playing Cards", "stuffed toys"],
-    # Boys birthday toys — action/vehicle toys for boys
-    "boys birthday toys":  ["Lego", "HotWheels", "UNO", "Playing Cards", "little"],
-    "boy birthday toys":   ["Lego", "HotWheels", "UNO", "Playing Cards", "little"],
-    "birthday toys for boys": ["Lego", "HotWheels", "UNO", "Playing Cards", "little"],
-    # Girls birthday toys — plush/doll-friendly toys for girls
-    "girls birthday toys":    ["stuffed toys", "UNO", "Playing Cards", "little"],
-    "girl birthday toys":     ["stuffed toys", "UNO", "Playing Cards", "little"],
-    "birthday toys for girls":["stuffed toys", "UNO", "Playing Cards", "little"],
-    # Lenten season food
-    "lenten season food": ["Escabeche", "Biko", "Puto Maya", "Binignit"],
-    "lenten food":        ["Escabeche", "Biko", "Puto Maya", "Binignit"],
-    "lenten":             ["Escabeche", "Biko", "Puto Maya", "Binignit"],
+    "birthday items": ["balloon", "party hats", "party poppers", "party decorations", "Lego", "little", "UNO", "HotWheels", "Hot Wheels", "Playing Cards", "balloons","Cake","Candles","candle","Gift Box","gift box","pink dress","pink flower"],
+    "Birthday": ["balloon", "party hats", "party poppers", "party decorations", "Lego", "little", "UNO", "HotWheels", "Hot Wheels", "Playing Cards", "balloons","Cake","Candles","candle","Gift Box","gift box","pink dress","pink flower"],
+    "birthdays": ["balloon", "party hats", "party poppers", "party decorations", "Lego", "little", "UNO", "HotWheels", "Hot Wheels", "Playing Cards", "balloons","Cake","Candles","candle","Gift Box","gift box","pink dress","pink flower"],
+    "Birthday items for girls": ["balloon", "party hats", "party poppers", "party decorations", "Lego", "little", "UNO", "HotWheels", "Hot Wheels", "Playing Cards", "balloons","pink dress","pink flower","Gift Box","gift box"],
+    "Birthday items for boys": ["balloon", "party hats", "party poppers", "party decorations", "Lego", "little", "UNO", "HotWheels", "Hot Wheels", "Playing Cards", "balloons","blue shirt","Gift Box","gift box"],
+    "Birthday items for kids": ["balloon", "party hats", "party poppers", "party decorations", "Lego", "little", "UNO", "HotWheels", "Hot Wheels", "Playing Cards", "balloons","pink dress","blue shirt","pink flower","Gift Box","gift box"],
+    "Birthday items for adults": ["balloon", "party hats", "party poppers", "party decorations", "Lego", "little", "UNO", "HotWheels", "Hot Wheels", "Playing Cards", "balloons","Gift Box","gift box"],
+    # Birthday toys — toy-specific gifts for a birthday; Exact=playable toys; Complement=balloon (decoration, not a toy)
+    "birthday toys": ["Lego", "little", "UNO", "HotWheels", "Hot Wheels", "Playing Cards",
+                      "stuffed toys", "balloon"],
+    "birthday toy":  ["Lego", "little", "UNO", "HotWheels", "Hot Wheels", "Playing Cards",
+                      "stuffed toys", "balloon"],
+    # Boys birthday toys — action/vehicle toys; Exact=Lego/HotWheels; Substitute=UNO/Playing Cards (gender-neutral); Complement=stuffed toys/balloon
+    "boys birthday toys":     ["Lego", "HotWheels", "Hot Wheels", "UNO", "Playing Cards",
+                                "little", "stuffed toys", "balloon"],
+    "boy birthday toys":      ["Lego", "HotWheels", "Hot Wheels", "UNO", "Playing Cards",
+                                "little", "stuffed toys", "balloon"],
+    "birthday toys for boys": ["Lego", "HotWheels", "Hot Wheels", "UNO", "Playing Cards",
+                                "little", "stuffed toys", "balloon"],
+    # Girls birthday toys — plush/doll toys; Exact=stuffed toys/little; Substitute=UNO/Playing Cards; Complement=Lego/HotWheels/balloon
+    "girls birthday toys":     ["stuffed toys", "little", "UNO", "Playing Cards",
+                                 "Lego", "HotWheels", "Hot Wheels", "balloon"],
+    "girl birthday toys":      ["stuffed toys", "little", "UNO", "Playing Cards",
+                                 "Lego", "HotWheels", "Hot Wheels", "balloon"],
+    "birthday toys for girls": ["stuffed toys", "little", "UNO", "Playing Cards",
+                                 "Lego", "HotWheels", "Hot Wheels", "balloon"],
+    # Kids food — child-friendly, easy-to-eat, sweet/fun foods kids enjoy
+    "kids food":      ["Buko Juice", "Biko", "Puto Maya", "Fudgee Barr", "M&Ms",
+                       "Mentos", "Skyflakes", "Gardenia Classic White Bread",
+                       "Corned Beef", "Sardines", "Luncheon Meat"],
+    "kids foods":     ["Buko Juice", "Biko", "Puto Maya", "Fudgee Barr", "M&Ms",
+                       "Mentos", "Skyflakes", "Gardenia Classic White Bread",
+                       "Corned Beef", "Sardines", "Luncheon Meat"],
+    "food for kids":  ["Buko Juice", "Biko", "Puto Maya", "Fudgee Barr", "M&Ms",
+                       "Mentos", "Skyflakes", "Gardenia Classic White Bread",
+                       "Corned Beef", "Sardines", "Luncheon Meat"],
+    "children food":  ["Buko Juice", "Biko", "Puto Maya", "Fudgee Barr", "M&Ms",
+                       "Mentos", "Skyflakes", "Gardenia Classic White Bread",
+                       "Corned Beef", "Sardines", "Luncheon Meat"],
+    "children foods": ["Buko Juice", "Biko", "Puto Maya", "Fudgee Barr", "M&Ms",
+                       "Mentos", "Skyflakes", "Gardenia Classic White Bread",
+                       "Corned Beef", "Sardines", "Luncheon Meat"],
 
-    # Snacks
-    "snacks": ["Marty's Cracklin", "Fudgee Barr", "Nagaraya", "Boy Bawang", "Oishi Prawn Crackers", "Skyflakes"],
-    "snack":  ["Marty's Cracklin", "Fudgee Barr", "Nagaraya", "Boy Bawang", "Oishi Prawn Crackers", "Skyflakes"],
-    "candy":      ["M&Ms", "Mentos", "Twizzlers", "sprinkles candy", "Ferrero"],
-    "candies":    ["M&Ms", "Mentos", "Twizzlers", "sprinkles candy", "Ferrero"],
-    "chocolates": ["M&Ms", "Ferrero"],
-    "chocolate":  ["M&Ms", "Ferrero"],
-    "sweets":     ["M&Ms", "Mentos", "Twizzlers", "sprinkles candy", "Ferrero"],
-    # Drinks
-    "drinks": ["Buko Juice"],
-    "drink":  ["Buko Juice"],
+    # Lenten season food: Exact=traditional fasting dishes; Substitute=Sardines (common Lenten protein, canned); Complement=Skyflakes (snack often eaten during fasting)
+    "lenten season food": ["Escabeche", "Biko", "Puto Maya", "Binignit",
+                           "Sardines", "Skyflakes"],
+    "lenten food":        ["Escabeche", "Biko", "Puto Maya", "Binignit",
+                           "Sardines", "Skyflakes"],
+    "lenten":             ["Escabeche", "Biko", "Puto Maya", "Binignit",
+                           "Sardines", "Skyflakes"],
+
+    # Snacks: Exact=savory Filipino snacks; Complement=candy/sweets; Irrelevant=clothing (completely unrelated)
+    "snacks": ["Marty's Cracklin", "Fudgee Barr", "Nagaraya", "Boy Bawang",
+               "Oishi Prawn Crackers", "Skyflakes",
+               "M&Ms", "Mentos", "Ferrero",
+               "Raincoat"],
+    "snack":  ["Marty's Cracklin", "Fudgee Barr", "Nagaraya", "Boy Bawang",
+               "Oishi Prawn Crackers", "Skyflakes",
+               "M&Ms", "Mentos", "Ferrero",
+               "Raincoat"],
+    # Candy/Sweets: Exact=candy items; Substitute=Ferrero; Complement=Skyflakes; Irrelevant=HotWheels (a toy, not food)
+    "candy":      ["M&Ms", "Mentos", "Twizzlers", "sprinkles candy", "Ferrero",
+                   "Skyflakes", "HotWheels"],
+    "candies":    ["M&Ms", "Mentos", "Twizzlers", "sprinkles candy", "Ferrero",
+                   "Skyflakes", "HotWheels"],
+    "chocolates": ["M&Ms", "Ferrero",
+                   "Mentos", "Twizzlers", "HotWheels"],
+    "chocolate":  ["M&Ms", "Ferrero",
+                   "Mentos", "Twizzlers", "HotWheels"],
+    "sweets":     ["M&Ms", "Mentos", "Twizzlers", "sprinkles candy", "Ferrero",
+                   "Skyflakes", "HotWheels"],
+    # Drinks: Exact=Buko Juice; Complement=Sardines (food, often paired with a drink)
+    "drinks": ["Buko Juice", "Sardines"],
+    "drink":  ["Buko Juice", "Sardines"],
 
     # ── School Supplies ───────────────────────────────────────────────────────
-    "school supplies": ["notebook", "pen", "pencil", "eraser", "ruler"],
-    "school":          ["notebook", "pen", "pencil", "eraser", "ruler"],
-    
+    # Exact=stationery; Complement=Lego (educational toy, not a school supply); Irrelevant=Sardines (food, nothing to do with school)
+    "school supplies": ["notebook", "pen", "pencil", "eraser", "ruler",
+                        "Lego", "Sardines"],
+    "school":          ["notebook", "pen", "pencil", "eraser", "ruler",
+                        "Lego", "Sardines"],
+
     # ── Toys ─────────────────────────────────────────────────────────────────
-    "toys":     ["Lego","little","UNO","HotWheels","Playing Cards","balloons","stuffed toys"],
-    "toy":      ["Lego","little","UNO","HotWheels","Playing Cards","balloons","stuffed toys"],
-    "for kids": ["Lego","little","UNO","HotWheels","Playing Cards","balloons","stuffed toys"],
+    # Exact=playable toys; Complement=balloons (decoration, not really a toy); Irrelevant=Sardines (food, nothing to do with toys)
+    "toys":     ["Lego", "little", "UNO", "HotWheels", "Hot Wheels", "Playing Cards",
+                 "balloons", "stuffed toys", "Sardines"],
+    "toy":      ["Lego", "little", "UNO", "HotWheels", "Hot Wheels", "Playing Cards",
+                 "balloons", "stuffed toys", "Sardines"],
+    "for kids": ["Lego", "little", "UNO", "HotWheels", "Hot Wheels", "Playing Cards",
+                 "balloons", "stuffed toys", "Sardines"],
     "balloon": ["balloon"],
     "balloons": ["balloon"],
     "party needs": ["balloon", "party hats", "party poppers", "party decorations"],
@@ -232,93 +299,140 @@ MEAT_COMPLEMENT_TITLES: set[str] = {"Luncheon Meat", "Meat Loaf",""}
 STATIC_ESCI: dict[str, dict] = {
 
     # ── Candy / Sweets ────────────────────────────────────────────────────────
-    # Ferrero Rocher is a gift chocolate box — Substitute for plain candy.
-    # M&Ms, Mentos, Twizzlers, SOFT candy are direct candy → Exact.
-    "candy":      {"substitute": {"Ferrero"}},
-    "candies":    {"substitute": {"Ferrero"}},
-    "sweets":     {"substitute": {"Ferrero"}},
-    # Chocolates query: M&Ms is Exact, Ferrero Rocher is also Exact (it IS chocolate).
-    # Mentos / Twizzlers are candy but not really chocolate → Substitute.
-    "chocolates": {"substitute": {"Mentos", "Twizzlers", "sprinkles"}},
-    "chocolate":  {"substitute": {"Mentos", "Twizzlers", "sprinkles"}},
+    # Ferrero Rocher = Substitute (gift chocolate, not casual candy).
+    # Skyflakes = Complement (savory cracker, not candy). HotWheels = Irrelevant (toy, not food).
+    "candy":      {"substitute": {"Ferrero"}, "complement": {"Skyflakes"}, "irrelevant": {"HotWheels"}},
+    "candies":    {"substitute": {"Ferrero"}, "complement": {"Skyflakes"}, "irrelevant": {"HotWheels"}},
+    "sweets":     {"substitute": {"Ferrero"}, "complement": {"Skyflakes"}, "irrelevant": {"HotWheels"}},
+    # Chocolates: M&Ms/Ferrero = Exact; Mentos/Twizzlers = Substitute; HotWheels = Irrelevant
+    "chocolates": {"substitute": {"Mentos", "Twizzlers", "sprinkles"}, "irrelevant": {"HotWheels"}},
+    "chocolate":  {"substitute": {"Mentos", "Twizzlers", "sprinkles"}, "irrelevant": {"HotWheels"}},
 
     # ── Snacks ────────────────────────────────────────────────────────────────
-    # All snack items are Exact for "snacks". Candy/sweets are Complement.
-    "snacks": {"complement": {"M&Ms", "Mentos", "Twizzlers", "Ferrero"}},
-    "snack":  {"complement": {"M&Ms", "Mentos", "Twizzlers", "Ferrero"}},
+    # Savory snacks = Exact. Candy/sweets = Complement. Raincoat = Irrelevant (clothing, not food).
+    "snacks": {"complement": {"M&Ms", "Mentos", "Ferrero"}, "irrelevant": {"Raincoat"}},
+    "snack":  {"complement": {"M&Ms", "Mentos", "Ferrero"}, "irrelevant": {"Raincoat"}},
 
     # ── Birthday ──────────────────────────────────────────────────────────────
-    # Balloons, banner, party pop = Exact birthday items.
-    # Toys (LEGO, UNO, Hot Wheels) = Complement (nice gift, not a birthday decoration).
-    # Ferrero = Complement (gift food, not a birthday decoration).
-    # Slap Bracelets = Substitute (party favour alternative).
-    "birthday items":           {"complement": {"LEGO", "Hot Wheels", "UNO", "Ferrero"},
+    # Balloons/decorations = Exact birthday items.
+    # Toys (LEGO, UNO, Hot Wheels) = Complement (nice gift, not a decoration).
+    # Ferrero = Complement (gift food).
+    "birthday items":           {"complement": {"LEGO", "Lego", "Hot Wheels", "HotWheels", "UNO", "Ferrero",
+                                                "stuffed toys", "Playing Cards"},
                                   "substitute": {"Slap Bracelets"}},
-    "birthday":                 {"complement": {"LEGO", "Hot Wheels", "UNO", "Ferrero"},
+    "birthday":                 {"complement": {"LEGO", "Lego", "Hot Wheels", "HotWheels", "UNO", "Ferrero",
+                                                "stuffed toys", "Playing Cards"},
                                   "substitute": {"Slap Bracelets"}},
-    "birthdays":                {"complement": {"LEGO", "Hot Wheels", "UNO", "Ferrero"},
+    "birthdays":                {"complement": {"LEGO", "Lego", "Hot Wheels", "HotWheels", "UNO", "Ferrero",
+                                                "stuffed toys", "Playing Cards"},
                                   "substitute": {"Slap Bracelets"}},
-    "birthday items for girls": {"complement": {"Ferrero"},
+    "birthday items for girls": {"complement": {"Ferrero", "stuffed toys"},
                                   "substitute": {"Slap Bracelets"}},
-    "birthday items for boys":  {"complement": {"LEGO", "Hot Wheels", "UNO"}},
-    "birthday items for kids":  {"complement": {"LEGO", "Hot Wheels", "UNO"},
+    "birthday items for boys":  {"complement": {"LEGO", "Lego", "Hot Wheels", "HotWheels", "UNO"}},
+    "birthday items for kids":  {"complement": {"LEGO", "Lego", "Hot Wheels", "HotWheels", "UNO"},
                                   "substitute": {"Slap Bracelets"}},
     "birthday items for adults": {"complement": {"Ferrero"}},
 
     # ── Toys ─────────────────────────────────────────────────────────────────
-    # LEGO, UNO, Hot Wheels = Exact toys.
-    # Balloons = Complement (party/play, not a toy per se).
-    "toys":          {"complement": {"balloon", "Balloons"}},
-    "toy":           {"complement": {"balloon", "Balloons"}},
-    "for kids":      {"complement": {"balloon", "Balloons"}},
-    # Birthday toys — all items are Exact (they are all playable toys)
-    "birthday toys": {},
-    "birthday toy":  {},
-    # Boys birthday toys — HotWheels/Lego are Exact; UNO/Playing Cards are Substitute (gender-neutral)
-    "boys birthday toys":     {"substitute": {"UNO", "Playing Cards"}},
-    "boy birthday toys":      {"substitute": {"UNO", "Playing Cards"}},
-    "birthday toys for boys": {"substitute": {"UNO", "Playing Cards"}},
-    # Girls birthday toys — stuffed toys are Exact; UNO/Playing Cards are Substitute (gender-neutral)
-    "girls birthday toys":     {"substitute": {"UNO", "Playing Cards"}},
-    "girl birthday toys":      {"substitute": {"UNO", "Playing Cards"}},
-    "birthday toys for girls": {"substitute": {"UNO", "Playing Cards"}},
+    # LEGO/UNO/HotWheels/stuffed toys = Exact. Balloons = Complement. Sardines = Irrelevant (food, not a toy).
+    "toys":          {"complement": {"balloon", "Balloons"}, "irrelevant": {"Sardines"}},
+    "toy":           {"complement": {"balloon", "Balloons"}, "irrelevant": {"Sardines"}},
+    "for kids":      {"complement": {"balloon", "Balloons"}, "irrelevant": {"Sardines"}},
+    # Birthday toys — playable toys = Exact; balloon = Complement (decoration)
+    "birthday toys": {"complement": {"balloon", "Balloons"}},
+    "birthday toy":  {"complement": {"balloon", "Balloons"}},
+    # Boys birthday toys — HotWheels/Lego = Exact; UNO/Playing Cards = Substitute (gender-neutral); stuffed toys/balloon = Complement
+    "boys birthday toys":     {"substitute": {"UNO", "Playing Cards"},
+                                "complement": {"stuffed toys", "balloon"}},
+    "boy birthday toys":      {"substitute": {"UNO", "Playing Cards"},
+                                "complement": {"stuffed toys", "balloon"}},
+    "birthday toys for boys": {"substitute": {"UNO", "Playing Cards"},
+                                "complement": {"stuffed toys", "balloon"}},
+    # Girls birthday toys — stuffed toys/little = Exact; UNO/Playing Cards = Substitute; Lego/HotWheels/balloon = Complement
+    "girls birthday toys":     {"substitute": {"UNO", "Playing Cards"},
+                                 "complement": {"Lego", "HotWheels", "Hot Wheels", "balloon"}},
+    "girl birthday toys":      {"substitute": {"UNO", "Playing Cards"},
+                                 "complement": {"Lego", "HotWheels", "Hot Wheels", "balloon"}},
+    "birthday toys for girls": {"substitute": {"UNO", "Playing Cards"},
+                                 "complement": {"Lego", "HotWheels", "Hot Wheels", "balloon"}},
 
     # ── Party supplies ────────────────────────────────────────────────────────
-    # Balloons, banner, party pop = Exact.
-    # Toys are Complement at a party (gift, not a supply).
-    "party needs":    {"complement": {"LEGO", "Hot Wheels", "UNO", "Ferrero"}},
-    "party supplies": {"complement": {"LEGO", "Hot Wheels", "UNO", "Ferrero"}},
+    # Balloons/decorations = Exact. Toys/food are Complement (gift items, not supplies).
+    "party needs":    {"complement": {"LEGO", "Lego", "Hot Wheels", "HotWheels", "UNO", "Ferrero"}},
+    "party supplies": {"complement": {"LEGO", "Lego", "Hot Wheels", "HotWheels", "UNO", "Ferrero"}},
 
     # ── School supplies ───────────────────────────────────────────────────────
-    # All items are Exact for "school" / "school supplies".
-    # No complements or substitutes needed.
-
-    # ── Halal / Muslim food ───────────────────────────────────────────────────
-    # All items are Exact (they are halal by definition in the category).
+    # Stationery = Exact. Lego = Complement (educational toy, not a supply). Sardines = Irrelevant (food, nothing to do with school).
+    "school supplies": {"complement": {"Lego"}, "irrelevant": {"Sardines"}},
+    "school":          {"complement": {"Lego"}, "irrelevant": {"Sardines"}},
 
     # ── Canned goods ─────────────────────────────────────────────────────────
-    # All items are Exact for "canned goods".
+    # Sardines/Luncheon Meat/Corned Beef/Meat Loaf = Exact. Gardenia bread = Complement (commonly eaten with canned goods). Buko Juice = Complement (drink paired with meal).
+    "canned goods":    {"complement": {"Gardenia", "Buko Juice"}},
+    "canned good":     {"complement": {"Gardenia", "Buko Juice"}},
+    "canned products": {"complement": {"Gardenia", "Buko Juice"}},
+    "canned product":  {"complement": {"Gardenia", "Buko Juice"}},
+    "canned food":     {"complement": {"Gardenia", "Buko Juice"}},
+    "canned":          {"complement": {"Gardenia", "Buko Juice"}},
+
+    # ── Halal / Muslim food ───────────────────────────────────────────────────
+    # Halal dishes = Exact. Escabeche = Substitute (fish, halal but not distinctly halal-branded). Buko Juice = Complement (drink, not a dish).
+    "halal food":  {"substitute": {"Escabeche"}, "complement": {"Buko Juice"}},
+    "muslim food": {"substitute": {"Escabeche"}, "complement": {"Buko Juice"}},
+    "halal":       {"substitute": {"Escabeche"}, "complement": {"Buko Juice"}},
 
     # ── Lenten food ───────────────────────────────────────────────────────────
-    # All items are Exact.
+    # Traditional Lenten dishes = Exact. Sardines = Substitute (common fasting protein, canned). Skyflakes = Complement (snack during fasting).
+    "lenten season food": {"substitute": {"Sardines"}, "complement": {"Skyflakes"}},
+    "lenten food":        {"substitute": {"Sardines"}, "complement": {"Skyflakes"}},
+    "lenten":             {"substitute": {"Sardines"}, "complement": {"Skyflakes"}},
+
+    # ── Drinks ───────────────────────────────────────────────────────────────
+    # Buko Juice = Exact. Sardines = Complement (food, not a drink — shown as pairing suggestion).
+    "drinks": {"complement": {"Sardines"}},
+    "drink":  {"complement": {"Sardines"}},
+
+    # ── Meat / Meats ─────────────────────────────────────────────────────────
+    # Fresh/cooked meat dishes = Exact. Luncheon Meat/Meat Loaf = Substitute (processed canned meat, not fresh). Sardines = Complement (canned fish, different protein).
+    "meat":  {"substitute": {"Luncheon Meat", "Meat Loaf"}, "complement": {"Sardines"}},
+    "meats": {"substitute": {"Luncheon Meat", "Meat Loaf"}, "complement": {"Sardines"}},
+
+    # ── Food ─────────────────────────────────────────────────────────────────
+    # Main dishes = Exact. Gardenia = Substitute. Canned goods/snacks = Complement. Raincoat = Irrelevant (clothing).
+    "food":  {"substitute": {"Gardenia"}, "complement": {"Sardines", "Luncheon Meat", "Corned Beef", "Meat Loaf", "Fudgee Barr", "Skyflakes"}, "irrelevant": {"Raincoat"}},
+    "foods": {"substitute": {"Gardenia"}, "complement": {"Sardines", "Luncheon Meat", "Corned Beef", "Meat Loaf", "Fudgee Barr", "Skyflakes"}, "irrelevant": {"Raincoat"}},
+
+    # ── Kids food ─────────────────────────────────────────────────────────────
+    # Sweet/fun foods (juice, kakanin, snacks, candy) = Exact for kids.
+    # Canned goods (Sardines, Corned Beef, Luncheon Meat) = Complement (adult staples, not kid-first).
+    "kids food":     {"complement": {"Sardines", "Luncheon Meat", "Corned Beef"}},
+    "kids foods":    {"complement": {"Sardines", "Luncheon Meat", "Corned Beef"}},
+    "food for kids": {"complement": {"Sardines", "Luncheon Meat", "Corned Beef"}},
+    "children food": {"complement": {"Sardines", "Luncheon Meat", "Corned Beef"}},
+    "children foods":{"complement": {"Sardines", "Luncheon Meat", "Corned Beef"}},
 
     # ── Seasonal food ────────────────────────────────────────────────────────
-    # Canned goods appear as Complement in seasonal food (convenient, not seasonal cuisine).
-    "seasonal food": {"complement": {"Sardines", "Luncheon Meat", "Corned Beef", "Meat Loaf"}},
-    "season food":   {"complement": {"Sardines", "Luncheon Meat", "Corned Beef", "Meat Loaf"}},
+    # Seasonal dishes = Exact. Canned goods = Complement (convenient, not seasonal cuisine). Gardenia = Substitute (neutral meal base).
+    "seasonal food": {"substitute": {"Gardenia"}, "complement": {"Sardines", "Luncheon Meat", "Corned Beef", "Meat Loaf"}},
+    "season food":   {"substitute": {"Gardenia"}, "complement": {"Sardines", "Luncheon Meat", "Corned Beef", "Meat Loaf"}},
 
     # ── Clothes ──────────────────────────────────────────────────────────────
-    # Hats/accessories = Complement for generic "clothes" searches.
+    # Hats/Keffiyeh = Complement (accessories, not clothing per se).
     "clothes":   {"complement": {"Summer Hat", "Hat", "Keffiyeh"}},
     "clothing":  {"complement": {"Summer Hat", "Hat", "Keffiyeh"}},
     "clothings": {"complement": {"Summer Hat", "Hat", "Keffiyeh"}},
 
-    # Rainy season: Raincoat/Rain Boots/Waterproof Jacket = Exact.
-    # No complements needed (list is already precise).
+    # Rainy season: Raincoat/Rain Boots/Waterproof Jacket = Exact. No complements (list is precise).
 
-    # Summer clothes: shorts/flip flops/shirt = Exact. Hat = Complement (accessory).
-    "summer clothes": {"complement": {"Summer Hat", "Hat"}},
-    "summer":         {"complement": {"Summer Hat", "Hat"}},
+    # Summer clothes: shorts/flip flops/shirt/Sarouel/etc = Exact. Hat = Complement (accessory). Keffiyeh = Complement (head covering, not summer-specific clothing).
+    "summer clothes": {"complement": {"Summer Hat", "Hat", "Keffiyeh"}},
+    "summer":         {"complement": {"Summer Hat", "Hat", "Keffiyeh"}},
+
+    # Seasonal/weather clothes: all garments = Exact. Hats = Complement.
+    "seasonal clothes":       {"complement": {"Summer Hat", "Hat", "Keffiyeh"}},
+    "season clothes":         {"complement": {"Summer Hat", "Hat", "Keffiyeh"}},
+    "weather clothes":        {"complement": {"Summer Hat", "Hat", "Keffiyeh"}},
+    "clothes for the season": {"complement": {"Summer Hat", "Hat", "Keffiyeh"}},
 }
 
 # Summer food = seasonal food EXCLUDING sardines, luncheon meat, canned goods, and snacks
@@ -365,12 +479,17 @@ def match_static_category(search_text: str) -> list[str] | None:
     return None
 
 
-def get_static_esci(search_text: str) -> tuple[set[str], set[str]]:
+def get_static_esci(search_text: str) -> tuple[set[str], set[str], set[str]]:
     """
-    Return (complement_keywords, substitute_keywords) for a static category query.
+    Return (complement_keywords, substitute_keywords, irrelevant_keywords) for a static category query.
     A product title is checked via case-insensitive substring match against each keyword.
+    Priority: irrelevant > substitute > complement > exact (default).
     Returns empty sets (all Exact) if no override is defined for the category.
     """
     normalized = search_text.lower().strip()
     overrides = STATIC_ESCI.get(normalized, {})
-    return overrides.get("complement", set()), overrides.get("substitute", set())
+    return (
+        overrides.get("complement", set()),
+        overrides.get("substitute", set()),
+        overrides.get("irrelevant", set()),
+    )
