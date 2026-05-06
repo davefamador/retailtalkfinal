@@ -111,11 +111,19 @@ class SearchResponse(BaseModel):
 
 def _first_image(images_field) -> str:
     """Extract the first image URL from a product's images field."""
-    images = images_field or []
-    if isinstance(images, str):
-        return images
-    if isinstance(images, list) and len(images) > 0:
-        return images[0]
+    if not images_field:
+        return ""
+    # Supabase may return TEXT[] as a PostgreSQL literal string e.g. "{url1,url2}"
+    if isinstance(images_field, str):
+        s = images_field.strip()
+        if s.startswith("{") and s.endswith("}"):
+            # Parse PostgreSQL array literal: strip braces and split on comma
+            inner = s[1:-1].strip()
+            if inner:
+                return inner.split(",")[0].strip().strip('"')
+        return s  # plain URL string
+    if isinstance(images_field, list) and len(images_field) > 0:
+        return images_field[0]
     return ""
 
 
@@ -347,7 +355,7 @@ def _try_static_search(rewritten, max_results: int):
             if r.id not in seen:
                 seen[r.id] = r
 
-        final = list(seen.values())[:max_results]
+        final = sorted(seen.values(), key=lambda r: (LABEL_PRIORITY.get(r.relevance_label, 3), -r.relevance_score))[:max_results]
         print(f"[Search] Static category match: {len(final)} products returned")
         return final
 
@@ -431,7 +439,10 @@ def _run_search_pipeline(
     else:
         ranker_scores = [c["similarity"] for c in candidates]
 
-    has_embeddings = any(len(c.get("embedding") or []) > 0 for c in candidates)
+    has_embeddings = any(
+        c.get("embedding") is not None and len(c["embedding"]) > 0
+        for c in candidates
+    )
     if classifier_service._loaded and has_embeddings:
         product_embeddings = np.array([c["embedding"] for c in candidates])
         classifications = classifier_service.classify_batch(esci_query_embedding, product_embeddings)
@@ -602,7 +613,7 @@ async def search_products(
             if r.id not in seen or r.relevance_score > seen[r.id].relevance_score:
                 seen[r.id] = r
 
-        final_results = sorted(seen.values(), key=lambda r: r.relevance_score, reverse=True)[:max_results]
+        final_results = sorted(seen.values(), key=lambda r: (LABEL_PRIORITY.get(r.relevance_label, 3), -r.relevance_score))[:max_results]
         print(f"[Search] Final results: {len(final_results)} (from {len(rewritten.search_groups)} group(s))")
 
         return SearchResponse(
@@ -664,7 +675,7 @@ async def _fallback_text_search(
     for r in all_results:
         if r.id not in seen or r.relevance_score > seen[r.id].relevance_score:
             seen[r.id] = r
-    results = sorted(seen.values(), key=lambda r: r.relevance_score, reverse=True)[:max_results]
+    results = sorted(seen.values(), key=lambda r: (LABEL_PRIORITY.get(r.relevance_label, 3), -r.relevance_score))[:max_results]
 
     return SearchResponse(
         query=original_query,

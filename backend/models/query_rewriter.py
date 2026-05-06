@@ -47,12 +47,171 @@ MODIFIER_WORDS = {
     "minimum", "maximum", "max", "min",
     "rating", "rated", "stars", "star",
     "i", "want", "need", "looking", "for", "find", "show", "me",
-    "the", "a", "an", "of", "with", "in", "na", "ng", "ang", "yung",
+    "the", "a", "an", "of", "with", "in", "this", "na", "ng", "ang", "yung",
     "paano", "saan", "ano", "may", "gusto", "ko", "hanap",
     "magkano", "pesos", "peso", "php",
     "priced", "costing", "costs", "worth", "price", "cost",
     "ranging", "range", "to",
 }
+
+
+# ---------------------------------------------------------------------------
+# Contextual phrase normaliser
+# Maps natural-language intent phrases to canonical static category keys
+# before the rest of the rewriter runs.
+#
+# Each rule is (trigger_pattern, category_pattern, canonical_output).
+# A rule fires when BOTH trigger AND category match the query.
+# Rules are checked in order; the first match wins.
+#
+# Examples:
+#   "a dress for this summer"          -> "summer clothes"
+#   "something to eat this summer"     -> "summer food"
+#   "snacks for the rainy season"      -> "rainy season clothes"  [no — snack wins]
+#   "food for the lenten season"       -> "lenten food"
+#   "toys for a birthday party"        -> "birthday items"
+#   "canned goods for camping"         -> "canned goods"  (already exact, passes through)
+# ---------------------------------------------------------------------------
+
+# Intent/category signal words grouped by static category
+_INTENT_RULES: list[tuple] = [
+    # ── Clothing + season ────────────────────────────────────────────────────
+    # trigger: clothing-related word   category: season keyword
+    (
+        re.compile(r'\b(dress|dresses|outfit|outfits|wear|wearing|attire|blouse|skirt|skirts|tshirt|t-shirt|top|tops|clothe|clothes|clothing)\b', re.IGNORECASE),
+        re.compile(r'\bsummer\b', re.IGNORECASE),
+        "summer clothes",
+    ),
+    (
+        re.compile(r'\b(dress|dresses|outfit|outfits|wear|wearing|attire|blouse|skirt|skirts|tshirt|t-shirt|top|tops|clothe|clothes|clothing)\b', re.IGNORECASE),
+        re.compile(r'\b(rain(y)?|wet)\b', re.IGNORECASE),
+        "rainy season clothes",
+    ),
+    (
+        re.compile(r'\b(dress|dresses|outfit|outfits|wear|wearing|attire|blouse|skirt|skirts|tshirt|t-shirt|top|tops|clothe|clothes|clothing)\b', re.IGNORECASE),
+        re.compile(r'\b(dry|hot)\b', re.IGNORECASE),
+        "dry season clothes",
+    ),
+    # ── Food + season ─────────────────────────────────────────────────────────
+    (
+        re.compile(r'\b(eat|eating|food|foods|meal|meals|dish|dishes|cuisine|recipe|cook|cooking)\b', re.IGNORECASE),
+        re.compile(r'\bsummer\b', re.IGNORECASE),
+        "summer food",
+    ),
+    (
+        re.compile(r'\b(eat|eating|food|foods|meal|meals|dish|dishes|cuisine|recipe|cook|cooking)\b', re.IGNORECASE),
+        re.compile(r'\b(lent(en)?|holy|easter|semana\s+santa)\b', re.IGNORECASE),
+        "lenten food",
+    ),
+    (
+        re.compile(r'\b(eat|eating|food|foods|meal|meals|dish|dishes|cuisine|recipe|cook|cooking)\b', re.IGNORECASE),
+        re.compile(r'\b(rain(y)?|wet)\b', re.IGNORECASE),
+        "seasonal food",
+    ),
+    (
+        re.compile(r'\b(eat|eating|food|foods|meal|meals|dish|dishes|cuisine|recipe|cook|cooking)\b', re.IGNORECASE),
+        re.compile(r'\b(dry|hot)\b', re.IGNORECASE),
+        "seasonal food",
+    ),
+    # ── Snacks + season / occasion ────────────────────────────────────────────
+    (
+        re.compile(r'\b(snack|snacks|munch|munching|junk|chips)\b', re.IGNORECASE),
+        re.compile(r'\b(party|birthday|celebration|event|occasion)\b', re.IGNORECASE),
+        "snacks",
+    ),
+    # ── Toys / birthday ───────────────────────────────────────────────────────
+    (
+        re.compile(r'\b(toy|toys|gift|gifts|present|presents|play|playing)\b', re.IGNORECASE),
+        re.compile(r'\b(birthday|party|celebration|kid|kids|children|child)\b', re.IGNORECASE),
+        "birthday items",
+    ),
+    (
+        re.compile(r'\b(give|buy|get|looking)\b', re.IGNORECASE),
+        re.compile(r'\b(birthday|party|celebration)\b', re.IGNORECASE),
+        "birthday items",
+    ),
+    # ── Canned goods context ──────────────────────────────────────────────────
+    (
+        re.compile(r'\b(can|canned|tin|tinned|preserved)\b', re.IGNORECASE),
+        re.compile(r'\b(food|goods|product|item)\b', re.IGNORECASE),
+        "canned goods",
+    ),
+    # ── Halal context ─────────────────────────────────────────────────────────
+    (
+        re.compile(r'\b(halal|muslim|islamic|islam)\b', re.IGNORECASE),
+        re.compile(r'\b(food|foods|eat|meal|dish)\b', re.IGNORECASE),
+        "halal food",
+    ),
+    # ── School supplies context ───────────────────────────────────────────────
+    (
+        re.compile(r'\b(school|study|studying|class|classroom|student|students)\b', re.IGNORECASE),
+        re.compile(r'\b(supply|supplies|material|materials|stuff|item|items|need|needs)\b', re.IGNORECASE),
+        "school supplies",
+    ),
+]
+
+
+# Price clause pattern — matches trailing or inline price filters so they can
+# be stripped before category matching and re-attached afterwards.
+# Handles: "less than 300 pesos", "under 500", "between 100 and 400", "more than 50"
+_PRICE_CLAUSE_RE = re.compile(
+    r'(\s+(?:less\s+than|under|below|at\s+most|cheaper\s+than|more\s+than|above|over|at\s+least)'
+    r'\s+\d+(?:\.\d+)?(?:\s+pesos?|php)?'
+    r'|\s+between\s+\d+(?:\.\d+)?\s+(?:and|to)\s+\d+(?:\.\d+)?(?:\s+pesos?|php)?)',
+    re.IGNORECASE,
+)
+
+# Matches a between-range so we can exclude its "and" from the conjunction guard
+_BETWEEN_RANGE_RE = re.compile(
+    r'\bbetween\s+\d+(?:\.\d+)?\s+(?:and|to)\s+\d+(?:\.\d+)?', re.IGNORECASE
+)
+
+_CONJUNCTION_RE = re.compile(
+    r'\b(and|at\s+saka|tapos|tsaka|pati(?:\s+na)?)\b', re.IGNORECASE
+)
+
+
+def _normalise_seasonal_clothing(query: str) -> str:
+    """
+    Check the query against contextual intent rules and rewrite to the
+    canonical static-category phrase so the static search can pick it up.
+    Price clauses are stripped before matching then re-attached to the result
+    so the rest of the rewriter can still extract the price filter.
+
+    "a dress for this summer"                          -> "summer clothes"
+    "food for this holy season less than 300 pesos"   -> "lenten food less than 300 pesos"
+    "something to eat this summer"                    -> "summer food"
+    "toys for a birthday party under 500"             -> "birthday items under 500"
+
+    Does NOT rewrite compound queries (conjunction guard).
+    Returns the original query unchanged when no rule matches.
+    """
+    # Guard: skip normalisation for compound queries so each group's filters
+    # are preserved. split_sentences() calls _process_single() per group,
+    # so each sub-sentence reaches here individually and will match correctly.
+    # Exception: "and" inside a between-range ("between 100 and 400") is not
+    # a product conjunction — strip those before checking.
+    query_for_conj_check = _BETWEEN_RANGE_RE.sub("", query)
+    if _CONJUNCTION_RE.search(query_for_conj_check):
+        return query
+
+    # Strip price clause before matching so it doesn't confuse the patterns,
+    # then re-attach it to the canonical result.
+    price_clause = ""
+    m = _PRICE_CLAUSE_RE.search(query)
+    if m:
+        price_clause = m.group(0)
+        query_for_match = query[:m.start()] + query[m.end():]
+    else:
+        query_for_match = query
+
+    for trigger_pat, category_pat, canonical in _INTENT_RULES:
+        if trigger_pat.search(query_for_match) and category_pat.search(query_for_match):
+            result = canonical + price_clause
+            print(f"[QueryRewriter] Contextual normalise: '{query}' -> '{result}'")
+            return result
+
+    return query
 
 
 # Conjunction patterns for compound query splitting
@@ -730,19 +889,36 @@ class QueryRewriterService:
 
     def _process_single(self, sentence: str) -> RewrittenQuery:
         """Process a single sentence through intent + slot + rewrite."""
+        # Step 0: Seasonal/contextual normalisation before ML models run.
+        # Converts "a dress for this summer" → "summer clothes so the static
+        # category lookup can match it deterministically.
+        normalised = _normalise_seasonal_clothing(sentence)
+        was_normalised = normalised != sentence
+
         # Step 1: Classify intents
         intent_result = {"intents": [], "probabilities": {}}
         if self._intent_service and self._intent_service._loaded:
-            intent_result = self._intent_service.predict(sentence)
+            intent_result = self._intent_service.predict(normalised)
 
         # Step 2: Extract slots
         slot_result = {"slots": {}, "tagged_tokens": []}
         if self._slot_service and self._slot_service._loaded:
-            slot_result = self._slot_service.extract(sentence)
+            slot_result = self._slot_service.extract(normalised)
+
+        # When the normalizer rewrote the sentence to a canonical category
+        # (e.g. "seasonal food"), the NER may tag part of that phrase as
+        # PRODUCT1 (e.g. "food"), which would then override the full category
+        # name as search_text. Strip PRODUCT slots so rewrite() falls back to
+        # cleaning the normalised query directly, preserving the full category.
+        if was_normalised:
+            slot_result["slots"] = {
+                k: v for k, v in slot_result["slots"].items()
+                if not k.startswith("PRODUCT")
+            }
 
         # Step 3: Rewrite
         return rewrite(
-            query=sentence,
+            query=normalised,
             intents=intent_result["intents"],
             slots=slot_result["slots"],
         )

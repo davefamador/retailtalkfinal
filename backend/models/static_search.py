@@ -205,10 +205,10 @@ STATIC_CATEGORIES = {
 }
 
 # Titles that appear in the "food" category but are canned goods — shown as Complement
-FOOD_COMPLEMENT_TITLES: set[str] = {"Sardines", "Luncheon Meat", "Corned Beef", "Meat Loaf"}
+FOOD_COMPLEMENT_TITLES: set[str] = {"Sardines", "Luncheon Meat", "Corned Beef", "Meat Loaf","Juice"}
 
 # Titles that appear in the "meat/meats" category but are canned — shown as Complement
-MEAT_COMPLEMENT_TITLES: set[str] = {"Luncheon Meat", "Meat Loaf"}
+MEAT_COMPLEMENT_TITLES: set[str] = {"Luncheon Meat", "Meat Loaf",""}
 
 # =============================================================================
 #  Per-category ESCI overrides

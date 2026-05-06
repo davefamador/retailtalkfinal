@@ -1623,7 +1623,7 @@ export default function AdminDashboard() {
                                     >
                                         <option value="">All Roles</option>
                                         <option value="buyer">Buyer</option>
-                                        <option value="seller">Seller</option>
+                                        <option value="staff">Staff</option>
                                         <option value="manager">Manager</option>
                                         <option value="delivery">Delivery</option>
 
