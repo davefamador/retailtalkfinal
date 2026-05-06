@@ -216,7 +216,7 @@ def _fetch_static_products(
     sb = get_supabase()
     ilike_filter = ",".join(f"title.ilike.%{t}%" for t in titles)
     qb = (sb.table("products")
-          .select("*")
+          .select("id,seller_id,title,description,price,stock,images")
           .eq("is_active", True)
           .eq("status", "approved")
           .gt("stock", 0)
@@ -389,14 +389,15 @@ def _run_search_pipeline(
         # Admin mode: fetch every active/approved product so nothing is hidden by
         # the pgvector top-K cap. Similarity is set to 0 (no vector ranking needed).
         sb = get_supabase()
-        qb = (sb.table("products").select("*")
+        qb = (sb.table("products")
+              .select("id,seller_id,title,description,price,stock,images")
               .eq("is_active", True).eq("status", "approved").gt("stock", 0))
         if filters.get("price_max") is not None:
             qb = qb.lte("price", filters["price_max"])
         if filters.get("price_min") is not None:
             qb = qb.gte("price", filters["price_min"])
         db_rows = qb.execute().data
-        candidates = [{**r, "similarity": 0.0, "embedding": r.get("embedding") if r.get("embedding") is not None else []} for r in db_rows]
+        candidates = [{**r, "similarity": 0.0, "embedding": []} for r in db_rows]
         print(f"[Search]   '{search_text}' (show_all): {len(candidates)} total products from DB")
     else:
         # Only price is used as a hard DB filter; brand/color are semantic (BERT)
@@ -418,7 +419,8 @@ def _run_search_pipeline(
 
         candidates = [c for c in raw_candidates if c["similarity"] >= 0.20]
 
-    candidates = [c for c in candidates if c.get("embedding") is not None and len(c.get("embedding") or []) > 0]
+    if not show_all:
+        candidates = [c for c in candidates if c.get("embedding") is not None and len(c.get("embedding")) > 0]
     if not candidates:
         return []
 
@@ -429,10 +431,9 @@ def _run_search_pipeline(
     else:
         ranker_scores = [c["similarity"] for c in candidates]
 
-    product_embeddings = np.array([c["embedding"] for c in candidates])
-    if classifier_service._loaded:
-        # Use the full original-query embedding (or the single-group embedding)
-        # so the ESCI classifier receives input closer to its training distribution.
+    has_embeddings = any(len(c.get("embedding") or []) > 0 for c in candidates)
+    if classifier_service._loaded and has_embeddings:
+        product_embeddings = np.array([c["embedding"] for c in candidates])
         classifications = classifier_service.classify_batch(esci_query_embedding, product_embeddings)
     else:
         classifications = [{"label": "Exact", "confidence": 1.0, "class_id": 0,
