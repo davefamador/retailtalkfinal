@@ -216,10 +216,10 @@ STATIC_CATEGORIES = {
     "sweets":     ["M&Ms", "Mentos", "Twizzlers", "sprinkles candy", "Ferrero",
                    "Skyflakes", "HotWheels"],
     # Drinks / Juice — "Juice" keyword matches any product whose title contains "juice"
-    "drinks": ["Juice"],
-    "drink":  ["Juice"],
-    "juice":  ["Juice"],
-    "juices": ["Juice"],
+    "drinks": ["Juice","drink","softdrinks","SOFTDRINKS","sodadrink","SODADRINK","softdrinks","juices","JUICES","Juices","JUICE","JUICES","Juices"],
+    "drink":  ["Juice","drink","softdrinks","SOFTDRINKS","sodadrink","SODADRINK","softdrinks","juices","JUICES","Juices","JUICE","JUICES","Juices"],
+    "juice":  ["Juice","drink","softdrinks","SOFTDRINKS","sodadrink","SODADRINK","softdrinks","juices","JUICES","Juices","JUICE","JUICES","Juices"],
+    "juices": ["Juice","drink","softdrinks","SOFTDRINKS","sodadrink","SODADRINK","softdrinks","juices","JUICES","Juices","JUICE","JUICES","Juices"],
 
     # ── School Supplies ───────────────────────────────────────────────────────
     # Exact=stationery; Complement=Lego (educational toy, not a school supply); Irrelevant=Sardines (food, nothing to do with school)
@@ -228,14 +228,32 @@ STATIC_CATEGORIES = {
     "school":          ["notebook", "pen", "pencil", "eraser", "ruler",
                         "Lego", "Sardines"],
 
-    # ── Toys ─────────────────────────────────────────────────────────────────
-    # Exact=playable toys; Complement=balloons (decoration, not really a toy); Irrelevant=Sardines (food, nothing to do with toys)
+    # ── Toys / Kids ───────────────────────────────────────────────────────────
+    # Exact=playable toys; Complement=balloons+candy (fun but not toys); Irrelevant=Sardines
     "toys":     ["Lego", "little", "UNO", "HotWheels", "Hot Wheels", "Playing Cards",
-                 "balloons", "stuffed toys", "Sardines"],
+                 "Mini Plush", "stuffed toys", "My Little Pony", "balloon",
+                 "M&Ms", "Mentos", "Ferrero", "Twizzlers", "sprinkles candy",
+                 "Pony"],
     "toy":      ["Lego", "little", "UNO", "HotWheels", "Hot Wheels", "Playing Cards",
-                 "balloons", "stuffed toys", "Sardines"],
+                 "Mini Plush", "stuffed toys", "My Little Pony", "balloon",
+                 "M&Ms", "Mentos", "Ferrero", "Twizzlers", "sprinkles candy",
+                 "Pony"],
     "for kids": ["Lego", "little", "UNO", "HotWheels", "Hot Wheels", "Playing Cards",
-                 "balloons", "stuffed toys", "Sardines"],
+                 "Mini Plush", "stuffed toys", "My Little Pony", "balloon",
+                 "M&Ms", "Mentos", "Ferrero", "Twizzlers", "sprinkles candy",
+                 "Pony"],
+    "kid":      ["Lego", "little", "UNO", "HotWheels", "Hot Wheels", "Playing Cards",
+                 "Mini Plush", "stuffed toys", "My Little Pony", "balloon",
+                 "M&Ms", "Mentos", "Ferrero", "Twizzlers", "sprinkles candy",
+                 "Pony"],
+    "kids":     ["Lego", "little", "UNO", "HotWheels", "Hot Wheels", "Playing Cards",
+                 "Mini Plush", "stuffed toys", "My Little Pony", "balloon",
+                 "M&Ms", "Mentos", "Ferrero", "Twizzlers", "sprinkles candy",
+                 "Pony"],
+    "for kid":  ["Lego", "little", "UNO", "HotWheels", "Hot Wheels", "Playing Cards",
+                 "Mini Plush", "stuffed toys", "My Little Pony", "balloon",
+                 "M&Ms", "Mentos", "Ferrero", "Twizzlers", "sprinkles candy",
+                 "Pony"],
     "balloon": ["balloon"],
     "balloons": ["balloon"],
     "party needs": ["balloon", "party hats", "party poppers", "party decorations"],
@@ -251,7 +269,28 @@ STATIC_CATEGORIES = {
     "clothings": ["Raincoat", "Rain Boots", "Waterproof Jacket", "shorts", "flip flops",
                   "shirt", "casual sleeveless tops", "Sarouel Pants", "Jacket",
                   "Keffiyeh", "Long Sleeve", "Summer Hat", "Hat"],
-
+    "boy clothes": ["men's t-shirt","t-shirt","shirt","shirts","t-shirts","T-Shirt","t-shirts","T-SHIRTS","T-SHIRT","Shirt"],
+    "boy shirts": ["men's t-shirt","t-shirt","shirt","shirts","t-shirts","T-Shirt","t-shirts","T-SHIRTS","T-SHIRT","Shirt","Shirts"],
+    "boy's clothes": ["men's t-shirt","t-shirt","shirt","shirts","t-shirts","T-Shirt","t-shirts","T-SHIRTS","T-SHIRT","Shirt","Shirts"],
+    "boy's shirts": ["men's t-shirt","t-shirt","shirt","shirts","t-shirts","T-Shirt","t-shirts","T-SHIRTS","T-SHIRT","Shirt","Shirts"],
+    "men's t-shirt": ["men's t-shirt","t-shirt","shirt","shirts","t-shirts","T-Shirt","t-shirts","T-SHIRTS","T-SHIRT","Shirt","Shirts"],
+    "men's t-shirt": ["men's t-shirt","t-shirt","shirt","shirts","t-shirts","T-Shirt","t-shirts","T-SHIRTS","T-SHIRT","Shirt","Shirts"],
+    "men's t-shirt": ["men's t-shirt","t-shirt","shirt","shirts","t-shirts","T-Shirt","t-shirts","T-SHIRTS","T-SHIRT","Shirt","Shirts"],
+    "men's t-shirt": ["men's t-shirt","t-shirt","shirt","shirts","t-shirts","T-Shirt","t-shirts","T-SHIRTS","T-SHIRT","Shirt","Shirts"],
+    "girl clothes": ["dress","women dress","little dress","little dresses"],
+    "girl dress": ["dress","women dress","little dress","little dresses"],
+    "girl dresses": ["dress","women dress","little dress","little dresses"],
+    "girl's clothes": ["dress","women dress","little dress","little dresses"],
+    "girl's dress": ["dress","women dress","little dress","little dresses"],
+    "girl's dresses": ["dress","women dress","little dress","little dresses"],
+    "woman clothes":["women dress","dress"],
+    "women dresses":["women dress","dress"],
+    "women's clothes":["women dress","dress"],
+    "women's dresses":["women dress","dress"],
+    "dress": ["women dress","dress"],
+    "Dress": ["women dress","dress"],
+    "Dresses": ["women dress","dress"],
+    "dresses": ["women dress","dress"],
     # Seasonal clothes (all seasons)
     "season clothes":       ["Raincoat", "Rain Boots", "Waterproof Jacket", "shorts", "flip flops",
                              "shirt", "casual sleeveless tops", "Sarouel Pants", "Jacket",
@@ -337,11 +376,14 @@ STATIC_ESCI: dict[str, dict] = {
                                   "substitute": {"Slap Bracelets"}},
     "birthday items for adults": {"complement": {"Ferrero"}},
 
-    # ── Toys ─────────────────────────────────────────────────────────────────
-    # LEGO/UNO/HotWheels/stuffed toys = Exact. Balloons = Complement. Sardines = Irrelevant (food, not a toy).
-    "toys":          {"complement": {"balloon", "Balloons"}, "irrelevant": {"Sardines"}},
-    "toy":           {"complement": {"balloon", "Balloons"}, "irrelevant": {"Sardines"}},
-    "for kids":      {"complement": {"balloon", "Balloons"}, "irrelevant": {"Sardines"}},
+    # ── Toys / Kids ───────────────────────────────────────────────────────────
+    # Exact=playable toys+plush+pony. Complement=balloon+candy. Irrelevant=Sardines.
+    "toys":     {"complement": {"balloon", "M&Ms", "Mentos", "Ferrero", "Twizzlers", "sprinkles"}, "irrelevant": {"Sardines"}},
+    "toy":      {"complement": {"balloon", "M&Ms", "Mentos", "Ferrero", "Twizzlers", "sprinkles"}, "irrelevant": {"Sardines"}},
+    "for kids": {"complement": {"balloon", "M&Ms", "Mentos", "Ferrero", "Twizzlers", "sprinkles"}, "irrelevant": {"Sardines"}},
+    "kid":      {"complement": {"balloon", "M&Ms", "Mentos", "Ferrero", "Twizzlers", "sprinkles"}, "irrelevant": {"Sardines"}},
+    "kids":     {"complement": {"balloon", "M&Ms", "Mentos", "Ferrero", "Twizzlers", "sprinkles"}, "irrelevant": {"Sardines"}},
+    "for kid":  {"complement": {"balloon", "M&Ms", "Mentos", "Ferrero", "Twizzlers", "sprinkles"}, "irrelevant": {"Sardines"}},
     # Birthday toys — playable toys = Exact; balloon = Complement (decoration)
     "birthday toys": {"complement": {"balloon", "Balloons"}},
     "birthday toy":  {"complement": {"balloon", "Balloons"}},
