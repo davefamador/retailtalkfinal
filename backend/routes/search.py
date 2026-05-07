@@ -44,7 +44,7 @@ Pipeline Stages:
 
 from fastapi import APIRouter, Query, HTTPException, UploadFile, File
 from pydantic import BaseModel
-from typing import Optional
+
 import traceback
 import tempfile
 import os
@@ -83,6 +83,7 @@ class SearchResultItem(BaseModel):
     price: float
     stock: int = 0
     image_url: str
+    images: list[str] = []
     seller_id: str
     # Scoring components
     similarity: float = 0.0          # pgvector cosine similarity (0-1)
@@ -114,22 +115,27 @@ class SearchResponse(BaseModel):
 #  Helper Functions
 # =============================================================================
 
-def _first_image(images_field) -> str:
-    """Extract the first image URL from a product's images field."""
+def _parse_images(images_field) -> list[str]:
+    """Return a clean list of non-empty image URL strings from the DB images field."""
     if not images_field:
-        return ""
-    # Supabase may return TEXT[] as a PostgreSQL literal string e.g. "{url1,url2}"
+        return []
     if isinstance(images_field, str):
         s = images_field.strip()
         if s.startswith("{") and s.endswith("}"):
-            # Parse PostgreSQL array literal: strip braces and split on comma
             inner = s[1:-1].strip()
-            if inner:
-                return inner.split(",")[0].strip().strip('"')
-        return s  # plain URL string
-    if isinstance(images_field, list) and len(images_field) > 0:
-        return images_field[0]
-    return ""
+            if not inner:
+                return []
+            return [p.strip().strip('"') for p in inner.split(",") if p.strip().strip('"')]
+        return [s] if s else []
+    if isinstance(images_field, list):
+        return [item.strip() for item in images_field if item and isinstance(item, str) and item.strip()]
+    return []
+
+
+def _first_image(images_field) -> str:
+    """Extract the first non-empty image URL from a product's images field."""
+    imgs = _parse_images(images_field)
+    return imgs[0] if imgs else ""
 
 
 def _compute_blended_score(
@@ -303,13 +309,15 @@ def _fetch_static_products(
 
         relevance_score = round(0.55 * ranker_score + 0.05 * esci_weight + 0.40 * similarity, 4)
 
+        _imgs = _parse_images(p.get("images"))
         results.append(SearchResultItem(
             id=str(p["id"]),
             title=p["title"],
             description=p.get("description") or "",
             price=float(p["price"]),
             stock=int(p.get("stock", 0)),
-            image_url=_first_image(p.get("images")),
+            image_url=_imgs[0] if _imgs else "",
+            images=_imgs,
             seller_id=str(p["seller_id"]),
             similarity=similarity,
             ranker_score=ranker_score,
@@ -516,12 +524,14 @@ def _run_search_pipeline(
             if not show_all and label == "Complement" and not include_complements:
                 continue
         low_relevance = rel < 0.10
+        _imgs = _parse_images(cand.get("images"))
         scored.append(SearchResultItem(
             id=str(cand["id"]), title=cand["title"],
             description=cand.get("description") or "",
             price=float(cand["price"]),
             stock=int(cand.get("stock", 0)),
-            image_url=_first_image(cand.get("images")),
+            image_url=_imgs[0] if _imgs else "",
+            images=_imgs,
             seller_id=str(cand["seller_id"]),
             similarity=round(sim, 4), ranker_score=round(r_score, 4),
             relevance_score=round(rel, 4),
@@ -655,11 +665,13 @@ async def _fallback_text_search(
         response = qb.limit(max_results).execute()
 
         for p in response.data:
+            _imgs = _parse_images(p.get("images"))
             all_results.append(SearchResultItem(
                 id=str(p["id"]), title=p["title"],
                 description=p.get("description") or "",
                 price=float(p["price"]),
-                image_url=_first_image(p.get("images")),
+                image_url=_imgs[0] if _imgs else "",
+                images=_imgs,
                 seller_id=str(p["seller_id"]),
                 similarity=1.0, ranker_score=0.0, relevance_score=1.0,
                 relevance_label="Exact", relevance_confidence=1.0,

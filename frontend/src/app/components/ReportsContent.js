@@ -162,66 +162,6 @@ export default function ReportsContent() {
                     <h1 style={{ fontSize: '1.5rem', fontWeight: 800 }}>Insights & Reports</h1>
                     <p style={{ color: 'var(--text-secondary)', fontSize: '0.9rem' }}>Comprehensive analytics to grow your business</p>
                 </div>
-                <button
-                    onClick={() => {
-                        const csv = [
-                            ['Seller Report Summary'],
-                            ['Generated on', new Date().toLocaleString()],
-                            [],
-                            ['FINANCIAL SUMMARY'],
-                            ['Metric', 'Value'],
-                            ['Gross Merchandise Value', `₱${gmv.toFixed(2)}`],
-                            ['Net Revenue (90%)', `₱${netRevenue.toFixed(2)}`],
-                            ['Platform Commission (10%)', `₱${totalCommission.toFixed(2)}`],
-                            ['Average Order Value', `₱${aov.toFixed(2)}`],
-                            ['Total Orders', totalOrders],
-                            [],
-                            ['REVENUE TRENDS', trendPeriod.toUpperCase()],
-                            ['Period', 'Revenue'],
-                            ...revenueSeries.map(([label, value]) => [label, `₱${value.toFixed(2)}`]),
-                            [],
-                            ['PERIOD COMPARISONS'],
-                            ['Period', 'Current', 'Previous', 'Change %'],
-                            ['Today vs Yesterday', `₱${todaySales.toFixed(2)}`, `₱${yesterdaySales.toFixed(2)}`, `${pctChange(todaySales, yesterdaySales).toFixed(1)}%`],
-                            ['This Week vs Last Week', `₱${thisWeekSales.toFixed(2)}`, `₱${lastWeekSales.toFixed(2)}`, `${pctChange(thisWeekSales, lastWeekSales).toFixed(1)}%`],
-                            ['This Month vs Last Month', `₱${thisMonthSales.toFixed(2)}`, `₱${lastMonthSales.toFixed(2)}`, `${pctChange(thisMonthSales, lastMonthSales).toFixed(1)}%`],
-                            [],
-                            ['OPERATIONS SUMMARY'],
-                            ['Metric', 'Value'],
-                            ['Total Products', products.length],
-                            ['Healthy Stock (>5)', healthyStockProducts.length],
-                            ['Low Stock (1-5)', lowStockProducts.length],
-                            ['Out of Stock', outOfStockProducts.length],
-                            ['Products with Tracking', productsWithTracking.length],
-                            ['Fulfillment Rate', `${products.length > 0 ? ((productsWithTracking.length / products.length) * 100).toFixed(0) : 0}%`],
-                            [],
-                            ['TOP SELLING PRODUCTS'],
-                            ['Rank', 'Product Title', 'Times Sold', 'Total Revenue'],
-                            ...topSellingProducts.map((p, i) => [i + 1, p.title || 'Untitled', p.count, `₱${p.revenue.toFixed(2)}`]),
-                        ];
-                        const csvContent = csv.map(row => row.map(cell => `"${cell}"`).join(',')).join('\n');
-                        const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-                        const link = document.createElement('a');
-                        const url = URL.createObjectURL(blob);
-                        link.setAttribute('href', url);
-                        link.setAttribute('download', `seller-report-${new Date().toISOString().split('T')[0]}.csv`);
-                        link.style.visibility = 'hidden';
-                        document.body.appendChild(link);
-                        link.click();
-                        document.body.removeChild(link);
-                    }}
-                    style={{
-                        display: 'flex', alignItems: 'center', gap: 8,
-                        padding: '10px 20px', borderRadius: 10, border: '1px solid rgba(99,102,241,0.3)',
-                        background: 'rgba(99,102,241,0.1)', color: '#6366f1',
-                        cursor: 'pointer', fontWeight: 700, fontSize: '0.85rem',
-                        fontFamily: 'Inter, sans-serif', transition: 'all 0.2s',
-                    }}
-                    onMouseEnter={e => e.currentTarget.style.background = 'rgba(99,102,241,0.2)'}
-                    onMouseLeave={e => e.currentTarget.style.background = 'rgba(99,102,241,0.1)'}
-                >
-                    📥 Export CSV
-                </button>
             </div>
 
             <div style={{ display: 'flex', gap: 8, marginBottom: 24, background: 'var(--card-bg)', borderRadius: 12, padding: 6, border: '1px solid var(--border-color)' }}>

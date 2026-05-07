@@ -3674,63 +3674,6 @@ export default function AdminDashboard() {
                         <div>
                             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24 }}>
                                 <h1 style={{ fontSize: '1.5rem', fontWeight: 800 }}>Financial Reports</h1>
-                                {reports && (
-                                    <button
-                                        onClick={() => {
-                                            const csv = [
-                                                ['Financial Report Summary'],
-                                                ['Generated on', new Date().toLocaleString()],
-                                                [],
-                                                ['OVERVIEW STATISTICS'],
-                                                ['Metric', 'Value'],
-                                                ['Total Revenue', `PHP ${reports.total_revenue.toFixed(2)}`],
-                                                ['Total Orders', reports.total_orders],
-                                                ['Average Order Value', `PHP ${reports.avg_transaction_value.toFixed(2)}`],
-                                                ['Overall Expected Revenue', `PHP ${reports.overall_expected_revenue?.toFixed(2) || '0.00'}`],
-                                                [],
-                                                ['EXPECTED & CURRENT REVENUE BREAKDOWN BY STORE'],
-                                                ['Store Name', 'Expected Revenue', 'Current Revenue'],
-                                                ...(reports.store_reports || []).map(s => [s.store_name, `PHP ${s.expected_revenue?.toFixed(2) || '0.00'}`, `PHP ${s.current_revenue?.toFixed(2) || '0.00'}`]),
-                                                [],
-                                                ['PRODUCT REVENUE BY STORE'],
-                                                ['Store Name', 'Product Title', 'Expected Revenue', 'Current Revenue'],
-                                                ...(reports.product_reports || []).map(p => {
-                                                    const store = (reports.store_reports || []).find(s => s.store_id === p.store_id) || {};
-                                                    return [store.store_name || 'Unknown Store', p.product_title, `PHP ${p.expected_revenue?.toFixed(2) || '0.00'}`, `PHP ${p.current_revenue?.toFixed(2) || '0.00'}`];
-                                                }),
-                                                [],
-                                                ['TOP SELLERS'],
-                                                ['Seller Name', 'Total Sales', 'Transaction Count'],
-                                                ...reports.top_sellers.map(s => [s.seller_name, `PHP ${s.total_sales.toFixed(2)}`, s.transaction_count]),
-                                                [],
-                                                ['TOP PRODUCTS'],
-                                                ['Product Title', 'Times Sold', 'Total Revenue'],
-                                                ...reports.top_products.map(p => [p.product_title, p.times_sold, `PHP ${p.total_revenue.toFixed(2)}`]),
-                                            ];
-                                            const csvContent = csv.map(row => row.map(cell => `"${cell}"`).join(',')).join('\n');
-                                            const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-                                            const link = document.createElement('a');
-                                            const url = URL.createObjectURL(blob);
-                                            link.setAttribute('href', url);
-                                            link.setAttribute('download', `admin-report-${new Date().toISOString().split('T')[0]}.csv`);
-                                            link.style.visibility = 'hidden';
-                                            document.body.appendChild(link);
-                                            link.click();
-                                            document.body.removeChild(link);
-                                        }}
-                                        style={{
-                                            display: 'flex', alignItems: 'center', gap: 8,
-                                            padding: '10px 20px', borderRadius: 10, border: '1px solid rgba(99,102,241,0.3)',
-                                            background: 'rgba(99,102,241,0.1)', color: '#6366f1',
-                                            cursor: 'pointer', fontWeight: 700, fontSize: '0.85rem',
-                                            fontFamily: 'Inter, sans-serif', transition: 'all 0.2s',
-                                        }}
-                                        onMouseEnter={e => e.currentTarget.style.background = 'rgba(99,102,241,0.2)'}
-                                        onMouseLeave={e => e.currentTarget.style.background = 'rgba(99,102,241,0.1)'}
-                                    >
-                                        <Download size={14} /> Export CSV
-                                    </button>
-                                )}
                             </div>
                             {reports ? (
                                 <>

@@ -241,13 +241,23 @@ export default function SearchContent() {
                         <div className="product-grid">
                             {results.results.filter(p => !p.stock || p.stock > 0).map((product) => (
                                 <div key={product.id} className="card product-card" onClick={() => openProduct(product)} style={{ cursor: 'pointer' }}>
-                                    {product.image_url && (
-                                        <div style={{ marginBottom: 12, borderRadius: 8, overflow: 'hidden' }}>
+                                    <div style={{ marginBottom: 12, borderRadius: 8, overflow: 'hidden', background: 'var(--bg-secondary)', height: 160 }}>
+                                        {product.image_url ? (
                                             <img src={product.image_url} alt={product.title}
                                                 style={{ width: '100%', height: 160, objectFit: 'cover', display: 'block' }}
-                                                onError={(e) => { e.target.style.display = 'none'; }} />
-                                        </div>
-                                    )}
+                                                onError={(e) => {
+                                                    e.target.style.display = 'none';
+                                                    e.target.parentElement.style.display = 'flex';
+                                                    e.target.parentElement.style.alignItems = 'center';
+                                                    e.target.parentElement.style.justifyContent = 'center';
+                                                    e.target.parentElement.innerHTML = '<span style="color:var(--text-muted);font-size:0.8rem">No Image</span>';
+                                                }} />
+                                        ) : (
+                                            <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                                                <span style={{ color: 'var(--text-muted)', fontSize: '0.8rem' }}>No Image</span>
+                                            </div>
+                                        )}
+                                    </div>
                                     {user?.role === 'admin' && (
                                         <div style={{ marginBottom: 12 }}>
                                             <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6 }}>
