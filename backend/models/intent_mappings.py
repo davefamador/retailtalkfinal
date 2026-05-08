@@ -216,11 +216,9 @@ INTENT_CATEGORIES = {
     # Exact=playable toys; Complement=balloons+candy (fun but not toys); Irrelevant=Sardines
     "toys":     ["Lego", "little", "UNO", "HotWheels", "Hot Wheels", "Playing Cards",
                  "Mini Plush", "stuffed toys", "My Little Pony", "balloon",
-                 "M&Ms", "Mentos", "Ferrero", "Twizzlers", "sprinkles candy",
-                 "Pony"],
+                 "M&Ms", "Mentos", "Ferrero", "Pony"],
     "toy":      ["Lego", "little", "UNO", "HotWheels", "Hot Wheels", "Playing Cards",
                  "Mini Plush", "stuffed toys", "My Little Pony", "balloon",
-                 "M&Ms", "Mentos", "Ferrero", "Twizzlers", "sprinkles candy",
                  "Pony"],
     "for kids": ["Lego", "little", "UNO", "HotWheels", "Hot Wheels", "Playing Cards",
                  "Mini Plush", "stuffed toys", "My Little Pony", "balloon",
@@ -342,7 +340,7 @@ INTENT_CATEGORIES = {
                         "Jacket", "Keffiyeh", "Long Sleeve", "Summer Hat", "Hat"],
     "summer":          ["shorts", "flip flops", "shirt", "Sarouel Pants",
                         "Jacket", "Keffiyeh", "Long Sleeve", "Summer Hat", "Hat"],
-
+    
     # Summer food (also handled by SUMMER_FOOD_KEYWORDS; listed here so
     # _split_space_separated_products can recognise the 2-word span)
     "summer food":         ["Beef Rendang", "Biko", "Binignit", "Buko Juice", "Escabeche",
