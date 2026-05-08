@@ -292,10 +292,10 @@ export default function SearchPage() {
                             {results.results.filter(p => p.stock === undefined || p.stock === null || p.stock > 0).map((product) => (
                                 <div
                                     key={product.id}
-                                    className="card product-card"
                                     onClick={() => openProduct(product)}
                                     style={{ cursor: 'pointer' }}
                                 >
+                                <div className="card product-card" style={{ height: '100%' }}>
                                     <div style={{ marginBottom: 12, borderRadius: 8, overflow: 'hidden', background: 'var(--bg-secondary)', height: 160 }}>
                                         {product.image_url ? (
                                             <img
@@ -360,6 +360,7 @@ export default function SearchPage() {
                                     </div>
 
                                 </div>
+                                </div>
                             ))}
                         </div>
                     )}
@@ -371,6 +372,7 @@ export default function SearchPage() {
                 product={selectedProduct}
                 user={user}
                 onClose={closeModal}
+                isDemo={false}
             />
 
             {/* Voice pulse animation */}
