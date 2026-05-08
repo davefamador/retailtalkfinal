@@ -242,7 +242,9 @@ INTENT_CATEGORIES = {
     "balloons": ["balloon"],
     "party needs": ["balloon", "party hats", "party poppers", "party decorations"],
     "party supplies": ["balloon", "party hats", "party poppers", "party decorations"],
-
+    "party": ["balloon", "party hats", "party poppers", "party decorations"],
+    "parties": ["balloon", "party hats", "party poppers", "party decorations"],
+    
     # ── Clothing — all ───────────────────────────────────────────────────────
     "clothes":   ["Raincoat", "Rain Boots", "Waterproof Jacket", "shorts", "flip flops",
                   "shirt", "casual sleeveless tops", "Sarouel Pants", "Jacket","pants",
@@ -254,11 +256,11 @@ INTENT_CATEGORIES = {
                   "shirt", "casual sleeveless tops", "Sarouel Pants", "Jacket",
                   "Keffiyeh", "Long Sleeve", "Summer Hat", "Hat","pants"],
     "shirts": ["shirt", "casual sleeveless tops", "Sarouel Pants", "Jacket",
-                  "Keffiyeh", "Long Sleeve", "Summer Hat", "pants"],
-    "shirt": ["shirt", "casual sleeveless tops", "Jacket",
-                  "Keffiyeh", "Long Sleeve", "Summer Hat","pants"],
-    "t shirt": ["shirt", "casual sleeveless tops", "Jacket",
                   "Keffiyeh", "Long Sleeve", "pants"],
+    "shirt": ["shirt", "casual sleeveless tops", "Jacket",
+                  "Keffiyeh", "Long Sleeve", "pants"],
+    "t shirt": ["shirt", "casual sleeveless tops", "Jacket",
+                  "Keffiyeh", "Long Sleeve","pants"],
     "t-shirt": ["shirt", "casual sleeveless tops", "Jacket",
                   "Keffiyeh", "Long Sleeve","pants"],
     "t-shirts": ["shirt", "casual sleeveless tops", "Jacket",
@@ -317,6 +319,10 @@ INTENT_CATEGORIES = {
     "woman attire":["women dress","dress","floral"],
     
     "summer dress":   ["women dress","dress","floral"],
+    "dress summer":   ["women dress","dress","floral"],
+    "skirt summer":   ["women dress","dress","floral"],
+    "blouse summer":  ["casual sleeveless tops", "shirt"],
+    "gown summer":    ["women dress", "dress", "floral"],
     "summer dresses": ["women dress","dress","floral"],
     "summer skirt":   ["casual sleeveless tops", "shorts", "flip flops", "shirt"],
     "summer blouse":  ["casual sleeveless tops", "shirt"],
