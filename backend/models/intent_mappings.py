@@ -97,7 +97,22 @@ INTENT_CATEGORIES = {
                         "Gardenia Classic White Bread", "Buko Juice"],
     "canned":          ["Sardines", "Luncheon Meat", "Meat Loaf", "Corned Beef",
                         "Gardenia Classic White Bread", "Buko Juice"],
-
+    "drinks": [
+        "Buko Juice", "Juice", "Juice drink", "orange juice", "mixed juice", "grape juice",
+        "fruit drink", "apple juice", "lemon juice", "iced tea", "iced tea in can", "iced tea bottle",
+        "red tea", "softdrinks", "Softdrinks", "SOFTDRINKS", "softdrinks", "juices", "JUICES",
+        "Juices", "JUICE", "JUICES", "Juices", "drink", "drinks", "coke in can", "coke in can 330ml",
+        "coke regular 320ml", "coke regular 320 ml", "coke regular 330ml", "coke regular 330ml",
+        "softdrinks in can", "softdrinks in can 330ml", "softdrinks regular 330ml",
+        "softdrinks in can 320ml", "softdrinks regular 320ml"
+    ],
+    "drink": ["Buko Juice", "Juice", "Juice drink", "orange juice", "mixed juice", "grape juice",
+              "fruit drink", "apple juice", "lemon juice", "iced tea", "iced tea in can", "iced tea bottle",
+              "red tea", "softdrinks", "Softdrinks", "SOFTDRINKS", "softdrinks", "juices", "JUICES",
+              "Juices", "JUICE", "JUICES", "Juices", "drink", "drinks", "coke in can", "coke in can 330ml",
+              "coke regular 320ml", "coke regular 320 ml", "coke regular 330ml", "coke regular 330ml",
+              "softdrinks in can", "softdrinks in can 330ml", "softdrinks regular 330ml",
+              "softdrinks in can 320ml", "softdrinks regular 320ml"],
     # food: Exact=main dishes; Substitute=bread; Complement=canned goods+snacks; Irrelevant=Raincoat+Buko Juice (drink/clothing, not food)
     "food":  ["Beef Rendang", "Tiyula Itum", "Pastil", "Kebab", "Escabeche", "Biko",
               "Puto Maya", "Binignit", "Shawarma", "Satay", "Pate",
