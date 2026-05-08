@@ -54,7 +54,7 @@ from models.bert_service import bert_service
 from models.classifier import classifier_service, LABEL_PRIORITY
 from models.ranker import ranker_service
 from models.query_rewriter import query_rewriter
-from models.static_search import match_static_category, get_static_esci
+from models.intent_mappings import match_intent_category, get_intent_esci
 from database import search_similar_products, search_similar_products_filtered, get_supabase
 from config import (
     SEARCH_TOP_K_CANDIDATES,
@@ -213,20 +213,13 @@ def _build_applied_filters(search_groups) -> dict:
     return merged
 
 
-def _fetch_static_products(
+def _fetch_intent_products(
     titles: list[str],
     filters: dict,
     complement_titles: set[str] | None = None,
     substitute_titles: set[str] | None = None,
     irrelevant_titles: set[str] | None = None,
 ) -> list[SearchResultItem]:
-    """
-    Fetch products by exact title from the database for static category matches.
-    Applies price filters and returns SearchResultItems with realistic scores
-    that reflect strong-but-not-perfect exact matches (same range as the ML pipeline).
-
-    Label priority: Irrelevant > Substitute > Complement > Exact (default).
-    """
     import hashlib
 
     complement_titles = complement_titles or set()
@@ -332,14 +325,14 @@ def _fetch_static_products(
     return results
 
 
-def _try_static_search(rewritten, max_results: int):
+def _try_intent_search(rewritten, max_results: int):
     """
-    Check if the rewritten query matches static product categories.
+    Check if the rewritten query matches known intent categories.
     Each search group is checked independently so compound queries
     like 'snacks less than 20 and halal food' work correctly with
     per-group price filters.
 
-    Returns list of SearchResultItems if ALL groups match static categories,
+    Returns list of SearchResultItems if ALL groups match intent categories,
     None otherwise (falls through to the ML pipeline).
     """
     try:
@@ -352,23 +345,23 @@ def _try_static_search(rewritten, max_results: int):
         per_group_limit = max(5, max_results // num_groups) if num_groups > 1 else max_results
 
         all_results = []
-        static_category_matched = False
+        intent_category_matched = False
 
         for i, group in enumerate(rewritten.search_groups):
-            titles = match_static_category(group.search_text)
+            titles = match_intent_category(group.search_text)
             if titles is None:
                 # At least one group doesn't match — fall through to ML pipeline
                 return None
-            static_category_matched = True
+            intent_category_matched = True
             # Resolve ESCI labels: start with hardcoded food/meat overrides,
-            # then fall back to per-category STATIC_ESCI overrides.
-            comp, sub, irr = get_static_esci(group.search_text)
-            group_results = _fetch_static_products(titles, group.filters, complement_titles=comp, substitute_titles=sub, irrelevant_titles=irr)
+            # then fall back to per-category INTENT_ESCI overrides.
+            comp, sub, irr = get_intent_esci(group.search_text)
+            group_results = _fetch_intent_products(titles, group.filters, complement_titles=comp, substitute_titles=sub, irrelevant_titles=irr)
             all_results.extend(group_results[:per_group_limit])
 
-        # If the query matched a static category, always return static results (even if empty).
+        # If the query matched an intent category, always return intent results (even if empty).
         # This hides products not yet in the database instead of leaking ML pipeline results.
-        if static_category_matched and not all_results:
+        if intent_category_matched and not all_results:
             return []
 
         # Deduplicate by product id (keep first occurrence)
@@ -381,7 +374,7 @@ def _try_static_search(rewritten, max_results: int):
         return final
 
     except Exception as e:
-        # Never let static search break the normal pipeline
+        # Never let intent search break the normal pipeline
         return None
 
 
@@ -565,17 +558,17 @@ async def search_products(
     try:
         rewritten = query_rewriter.process(q)
 
-        # === STATIC CATEGORY CHECK ===
-        static_results = _try_static_search(rewritten, max_results)
-        if static_results is not None:
+        # === INTENT CATEGORY CHECK ===
+        intent_results = _try_intent_search(rewritten, max_results)
+        if intent_results is not None:
             if not show_all:
-                static_results = [r for r in static_results if r.relevance_label != "Irrelevant"]
-            _log(f"[Search] '{q}' → {len(static_results)} products matched")
+                intent_results = [r for r in intent_results if r.relevance_label != "Irrelevant"]
+            _log(f"[Search] '{q}' → {len(intent_results)} products matched")
             return SearchResponse(
                 query=q,
-                total_results=len(static_results),
-                results=static_results,
-                message="" if static_results else "No products found matching your query.",
+                total_results=len(intent_results),
+                results=intent_results,
+                message="" if intent_results else "No products found matching your query.",
                 rewritten_query=rewritten.search_text,
                 detected_intents=rewritten.intents,
                 extracted_slots=_build_extracted_slots(rewritten),

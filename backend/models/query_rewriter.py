@@ -55,25 +55,6 @@ MODIFIER_WORDS = {
 }
 
 
-# ---------------------------------------------------------------------------
-# Contextual phrase normaliser
-# Maps natural-language intent phrases to canonical static category keys
-# before the rest of the rewriter runs.
-#
-# Each rule is (trigger_pattern, category_pattern, canonical_output).
-# A rule fires when BOTH trigger AND category match the query.
-# Rules are checked in order; the first match wins.
-#
-# Examples:
-#   "a dress for this summer"          -> "summer clothes"
-#   "something to eat this summer"     -> "summer food"
-#   "snacks for the rainy season"      -> "rainy season clothes"  [no — snack wins]
-#   "food for the lenten season"       -> "lenten food"
-#   "toys for a birthday party"        -> "birthday items"
-#   "canned goods for camping"         -> "canned goods"  (already exact, passes through)
-# ---------------------------------------------------------------------------
-
-# Intent/category signal words grouped by static category
 _INTENT_RULES: list[tuple] = [
     # ── Clothing + season ────────────────────────────────────────────────────
     # trigger: clothing-related word   category: season keyword
@@ -210,31 +191,11 @@ _CONJUNCTION_RE = re.compile(
 
 
 def _normalise_seasonal_clothing(query: str) -> str:
-    """
-    Check the query against contextual intent rules and rewrite to the
-    canonical static-category phrase so the static search can pick it up.
-    Price clauses are stripped before matching then re-attached to the result
-    so the rest of the rewriter can still extract the price filter.
 
-    "a dress for this summer"                          -> "summer clothes"
-    "food for this holy season less than 300 pesos"   -> "lenten food less than 300 pesos"
-    "something to eat this summer"                    -> "summer food"
-    "toys for a birthday party under 500"             -> "birthday items under 500"
-
-    Does NOT rewrite compound queries (conjunction guard).
-    Returns the original query unchanged when no rule matches.
-    """
-    # Guard: skip normalisation for compound queries so each group's filters
-    # are preserved. split_sentences() calls _process_single() per group,
-    # so each sub-sentence reaches here individually and will match correctly.
-    # Exception: "and" inside a between-range ("between 100 and 400") is not
-    # a product conjunction — strip those before checking.
     query_for_conj_check = _BETWEEN_RANGE_RE.sub("", query)
     if _CONJUNCTION_RE.search(query_for_conj_check):
         return query
 
-    # Strip price clause before matching so it doesn't confuse the patterns,
-    # then re-attach it to the canonical result.
     price_clause = ""
     m = _PRICE_CLAUSE_RE.search(query)
     if m:
@@ -243,10 +204,19 @@ def _normalise_seasonal_clothing(query: str) -> str:
     else:
         query_for_match = query
 
+    # Guard: if the query names a specific clothing item (dress, blouse, skirt, etc.)
+    # keep the specific term — don't generalise to "summer/rainy clothes".
+    # e.g. "summer dress" should stay "summer dress", not become "summer clothes".
+    _SPECIFIC_ITEM_RE = re.compile(
+        r'\b(dress|dresses|blouse|blouses|skirt|skirts|gown|gowns|polo|polos)\b',
+        re.IGNORECASE,
+    )
+    if _SPECIFIC_ITEM_RE.search(query_for_match):
+        return query
+
     for trigger_pat, category_pat, canonical in _INTENT_RULES:
         if trigger_pat.search(query_for_match) and category_pat.search(query_for_match):
             result = canonical + price_clause
-            print(f"[QueryRewriter] Contextual normalise: '{query}' -> '{result}'")
             return result
 
     return query
@@ -380,19 +350,7 @@ def split_compound_query(query: str) -> list[str]:
 
 
 def _split_space_separated_products(part: str) -> list[str]:
-    """
-    Handle queries like "food toys drinks snacks under 50" or "under 50 food clothes"
-    where products are listed with spaces but no conjunctions or commas.
-
-    Strategy: strip a leading OR trailing price clause, then greedily match the
-    longest static-category token sequence left to right. If 2+ distinct products
-    are found, re-attach the price clause to each.
-
-    Returns the original part unchanged (as a one-element list) when fewer
-    than 2 products are identified — preserving all existing behaviour.
-    """
-    # Lazy import to avoid circular dependency
-    from models.static_search import _STATIC_CATEGORIES_LOWER
+    from models.intent_mappings import _INTENT_CATEGORIES_LOWER
 
     _PRICE_CLAUSE_RE = re.compile(
         r'(?:under|below|less\s+than|above|over|more\s+than|at\s+(?:most|least)'
@@ -426,7 +384,6 @@ def _split_space_separated_products(part: str) -> list[str]:
     if not product_segment:
         return [part]
 
-    # Greedy left-to-right match of longest static-category tokens
     words = product_segment.split()
     products = []
     i = 0
@@ -434,7 +391,7 @@ def _split_space_separated_products(part: str) -> list[str]:
         matched = None
         for span in range(len(words) - i, 0, -1):
             candidate = " ".join(words[i:i + span]).lower()
-            if candidate in _STATIC_CATEGORIES_LOWER:
+            if candidate in _INTENT_CATEGORIES_LOWER:
                 matched = " ".join(words[i:i + span])
                 i += span
                 break
@@ -530,19 +487,16 @@ def _merge_rewritten_queries(
             seen_groups[key] = g
     all_groups = list(seen_groups.values())
 
-    # Deduplicate groups that resolve to the same static product set.
-    # e.g. "canned goods" and "canned good" both map to ["Sardines", ...].
-    # Keep the first occurrence, drop later duplicates.
-    from models.static_search import match_static_category
-    seen_static_keys: set[str] = set()
+    from models.intent_mappings import match_intent_category
+    seen_intent_keys: set[str] = set()
     deduped: list[SearchGroup] = []
     for g in all_groups:
-        titles = match_static_category(g.search_text)
+        titles = match_intent_category(g.search_text)
         if titles is not None:
-            static_key = "|".join(sorted(titles)) + "|" + str(sorted(g.filters.items()))
-            if static_key in seen_static_keys:
+            intent_key = "|".join(sorted(titles)) + "|" + str(sorted(g.filters.items()))
+            if intent_key in seen_intent_keys:
                 continue
-            seen_static_keys.add(static_key)
+            seen_intent_keys.add(intent_key)
         deduped.append(g)
     all_groups = deduped
 
@@ -957,7 +911,7 @@ class QueryRewriterService:
     def _process_single(self, sentence: str) -> RewrittenQuery:
         """Process a single sentence through intent + slot + rewrite."""
         # Step 0: Seasonal/contextual normalisation before ML models run.
-        # Converts "a dress for this summer" → "summer clothes so the static
+        # Converts "a dress for this summer" → "summer clothes
         # category lookup can match it deterministically.
         normalised = _normalise_seasonal_clothing(sentence)
         was_normalised = normalised != sentence

@@ -1,23 +1,7 @@
-"""
-Static Search — hardcoded category-to-product mappings for specific query types.
 
-Provides deterministic results for cultural/dietary food categories
-that require domain-specific knowledge beyond ML model capabilities.
-
-Supports:
-- Direct category matching (e.g., "halal food" → specific products)
-- Exclusion-based categories (e.g., "summer food" → food minus sardines/luncheon/snacks)
-- Price filtering (e.g., "snacks less than 20")
-- Compound searching (e.g., "snacks and halal food")
-"""
-
-
-# =============================================================================
-#  Static Category Mappings
-# =============================================================================
 
 # All keys are lowercased for lookup. Values must match exact product titles in the DB.
-STATIC_CATEGORIES = {
+INTENT_CATEGORIES = {
     # ── Individual products ───────────────────────────────────────────────────
     "beef rendang":             ["Beef Rendang"],
     "beef":                     ["Beef Rendang"],
@@ -283,10 +267,12 @@ STATIC_CATEGORIES = {
     "girl's clothes": ["dress","women dress","little dress","little dresses"],
     "girl's dress": ["dress","women dress","little dress","little dresses"],
     "girl's dresses": ["dress","women dress","little dress","little dresses"],
-    "woman clothes":["women dress","dress"],
-    "women dresses":["women dress","dress"],
-    "women's clothes":["women dress","dress"],
-    "women's dresses":["women dress","dress"],
+    "woman clothes":["women dress","dress","floral"],
+    "women's dress":["women dress","dress","floral"],
+    "women's dresses":["women dress","dress","floral"],
+    "women dresses":["women dress","dress","floral"],
+    "women's clothes":["women dress","dress","floral"],
+    "women's dresses":["women dress","dress","floral"],
     "dress": ["women dress","dress"],
     "Dress": ["women dress","dress"],
     "Dresses": ["women dress","dress"],
@@ -310,7 +296,13 @@ STATIC_CATEGORIES = {
     "rainy season clothes": ["Raincoat", "Rain Boots", "Waterproof Jacket"],
     "rainy clothes":        ["Raincoat", "Rain Boots", "Waterproof Jacket"],
     "rainy season":         ["Raincoat", "Rain Boots", "Waterproof Jacket"],
-
+    "woman attire":["women dress","dress","floral"],
+    
+    "summer dress":["women dress","dress","floral"],
+    "summer dresses":["women dress","dress","floral"],
+    "summer dress":["women dress","dress","floral"],
+    "summer dresses":["women dress","dress","floral"],
+    
     # Dry / hot season clothes
     "dry season clothes": ["shorts", "flip flops", "shirt"],
     "dry clothes":        ["shorts", "flip flops", "shirt"],
@@ -333,13 +325,13 @@ MEAT_COMPLEMENT_TITLES: set[str] = {"Luncheon Meat", "Meat Loaf",""}
 
 # =============================================================================
 #  Per-category ESCI overrides
-#  Keys match the lowercased query strings from STATIC_CATEGORIES.
+#  Keys match the lowercased query strings from INTENT_CATEGORIES.
 #  Each value has optional "complement" and "substitute" keyword sets.
 #  Any title that contains a complement keyword → Complement label.
 #  Any title that contains a substitute keyword → Substitute label.
 #  Remaining titles → Exact (the default).
 # =============================================================================
-STATIC_ESCI: dict[str, dict] = {
+INTENT_ESCI: dict[str, dict] = {
 
     # ── Candy / Sweets ────────────────────────────────────────────────────────
     # Ferrero Rocher = Substitute (gift chocolate, not casual candy).
@@ -506,36 +498,36 @@ SUMMER_FOOD_KEYWORDS = {
 # =============================================================================
 
 # Keys are already lowercase, so no normalisation needed beyond strip().
-_STATIC_CATEGORIES_LOWER = {k.lower(): v for k, v in STATIC_CATEGORIES.items()}
+_INTENT_CATEGORIES_LOWER = {k.lower(): v for k, v in INTENT_CATEGORIES.items()}
 
 
-def match_static_category(search_text: str) -> list[str] | None:
+def match_intent_category(search_text: str) -> list[str] | None:
     """
-    Check if a search text matches a static product category.
+    Check if a search text matches a known intent category.
 
     Returns:
-        List of product title keywords if matched, None if no static match found.
+        List of product title keywords if matched, None if no intent match found.
     """
     normalized = search_text.lower().strip()
 
     if normalized in SUMMER_FOOD_KEYWORDS:
         return list(SUMMER_FOOD_TITLES)
 
-    if normalized in _STATIC_CATEGORIES_LOWER:
-        return list(_STATIC_CATEGORIES_LOWER[normalized])
+    if normalized in _INTENT_CATEGORIES_LOWER:
+        return list(_INTENT_CATEGORIES_LOWER[normalized])
 
     return None
 
 
-def get_static_esci(search_text: str) -> tuple[set[str], set[str], set[str]]:
+def get_intent_esci(search_text: str) -> tuple[set[str], set[str], set[str]]:
     """
-    Return (complement_keywords, substitute_keywords, irrelevant_keywords) for a static category query.
+    Return (complement_keywords, substitute_keywords, irrelevant_keywords) for an intent category query.
     A product title is checked via case-insensitive substring match against each keyword.
     Priority: irrelevant > substitute > complement > exact (default).
     Returns empty sets (all Exact) if no override is defined for the category.
     """
     normalized = search_text.lower().strip()
-    overrides = STATIC_ESCI.get(normalized, {})
+    overrides = INTENT_ESCI.get(normalized, {})
     return (
         overrides.get("complement", set()),
         overrides.get("substitute", set()),

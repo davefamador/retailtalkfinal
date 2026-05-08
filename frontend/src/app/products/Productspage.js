@@ -1,10 +1,10 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { listProducts, getStoredUser, getStoredAdmin, getBuyerRecommendations } from '../../lib/api';
+import { listProducts, getStoredUser, getStoredAdmin } from '../../lib/api';
 import ProductDetailModal from '../components/ProductDetailModal';
 
-// Static demo products shown when DB is empty so user can see the UI
+// if cannot connect to supabase database it will show this products
 const DEMO_PRODUCTS = [
     {
         id: 'demo-1', title: 'Wireless Noise-Cancelling Headphones',
@@ -57,11 +57,6 @@ export default function ProductsPage() {
     const [user, setUser] = useState(null);
     const [usingDemo, setUsingDemo] = useState(false);
 
-    // Recommendations state
-    const [recommendations, setRecommendations] = useState([]);
-    const [recsBasedOn, setRecsBasedOn] = useState('');
-    const [recsLoading, setRecsLoading] = useState(false);
-
     // Modal state
     const [selectedProduct, setSelectedProduct] = useState(null);
 
@@ -69,24 +64,7 @@ export default function ProductsPage() {
         const storedUser = getStoredUser() || getStoredAdmin();
         setUser(storedUser);
         loadProducts();
-        if (storedUser) {
-            loadRecommendations();
-        }
     }, []);
-
-    const loadRecommendations = async () => {
-        setRecsLoading(true);
-        try {
-            const data = await getBuyerRecommendations();
-            setRecommendations(data.recommendations || []);
-            setRecsBasedOn(data.based_on || '');
-        } catch (err) {
-            // Silently fail — recommendations are optional
-            setRecommendations([]);
-        } finally {
-            setRecsLoading(false);
-        }
-    };
 
     const loadProducts = async () => {
         try {
@@ -138,95 +116,6 @@ export default function ProductsPage() {
                     color: 'var(--accent-primary)', marginBottom: 24,
                 }}>
                     ✨ These are demo products for preview. Sign up as a seller to add real products!
-                </div>
-            )}
-
-            {/* ===== RECOMMENDED FOR YOU ===== */}
-            {user && recommendations.length > 0 && (
-                <div style={{
-                    marginBottom: 36, padding: 28, borderRadius: 18,
-                    background: 'linear-gradient(135deg, rgba(108,99,255,0.08) 0%, rgba(0,212,170,0.06) 100%)',
-                    border: '1px solid rgba(108,99,255,0.15)',
-                }}>
-                    <div style={{ marginBottom: 20 }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 6 }}>
-                            <span style={{ fontSize: '1.15rem' }}>✨</span>
-                            <h2 style={{ fontSize: '1.25rem', fontWeight: 800, margin: 0 }}>
-                                Recommended For You
-                            </h2>
-                        </div>
-                        <p style={{
-                            color: 'var(--text-muted)', fontSize: '0.85rem', margin: 0, paddingLeft: 30,
-                        }}>
-                            {recsBasedOn && recsBasedOn !== 'popular'
-                                ? <>Based on your search for "<span style={{ color: 'var(--accent-primary)', fontWeight: 600 }}>{recsBasedOn}</span>"</>
-                                : 'Popular products you might like'
-                            }
-                        </p>
-                    </div>
-
-                    <div style={{
-                        display: 'grid',
-                        gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))',
-                        gap: 16,
-                    }}>
-                        {recommendations.map((p) => {
-                            const firstImage = p.images && p.images.length > 0 ? p.images[0] : null;
-                            return (
-                                <div
-                                    key={p.id}
-                                    onClick={() => openProduct(p)}
-                                    style={{ cursor: 'pointer', transition: 'transform 0.2s' }}
-                                    onMouseEnter={(e) => e.currentTarget.style.transform = 'translateY(-4px)'}
-                                    onMouseLeave={(e) => e.currentTarget.style.transform = 'translateY(0)'}
-                                >
-                                    <div style={{
-                                        borderRadius: 14, overflow: 'hidden',
-                                        background: 'var(--bg-card)',
-                                        border: '1px solid var(--border-color)',
-                                        height: '100%',
-                                    }}>
-                                        <div style={{
-                                            width: '100%', height: 150, overflow: 'hidden',
-                                            background: 'var(--bg-secondary)',
-                                        }}>
-                                            {firstImage ? (
-                                                <img
-                                                    src={firstImage} alt={p.title}
-                                                    style={{ width: '100%', height: '100%', objectFit: 'cover' }}
-                                                    onError={(e) => { e.target.style.display = 'none'; }}
-                                                />
-                                            ) : (
-                                                <div style={{
-                                                    width: '100%', height: '100%',
-                                                    display: 'flex', alignItems: 'center', justifyContent: 'center',
-                                                    color: 'var(--text-muted)', fontSize: '0.8rem',
-                                                }}>No Image</div>
-                                            )}
-                                        </div>
-                                        <div style={{ padding: '12px 14px' }}>
-                                            <div style={{
-                                                fontSize: '0.88rem', fontWeight: 700,
-                                                marginBottom: 6, lineHeight: 1.35,
-                                                display: '-webkit-box', WebkitLineClamp: 2,
-                                                WebkitBoxOrient: 'vertical', overflow: 'hidden',
-                                            }}>{p.title}</div>
-                                            <div style={{
-                                                fontSize: '1rem', fontWeight: 800,
-                                                color: 'var(--accent-secondary)',
-                                            }}>
-                                                PHP {parseFloat(p.price).toFixed(2)}
-                                            </div>
-                                            <div style={{
-                                                fontSize: '0.75rem', color: 'var(--text-muted)',
-                                                marginTop: 4,
-                                            }}>{p.seller_name || 'Seller'}</div>
-                                        </div>
-                                    </div>
-                                </div>
-                            );
-                        })}
-                    </div>
                 </div>
             )}
 
@@ -295,7 +184,8 @@ export default function ProductsPage() {
                                             </p>
                                             <div className="product-price">PHP {parseFloat(p.price).toFixed(2)}</div>
                                             <div className="product-meta">
-                                                <span style={{ fontSize: '0.75rem', fontWeight: 600, marginLeft: 'auto',
+                                                <span style={{
+                                                    fontSize: '0.75rem', fontWeight: 600, marginLeft: 'auto',
                                                     color: (p.stock || 0) > 0 ? 'var(--accent-success)' : 'var(--accent-danger)',
                                                 }}>
                                                     {(p.stock || 0) > 0 ? `${p.stock} in stock` : 'Out of stock'}
