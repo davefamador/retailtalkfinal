@@ -46,7 +46,8 @@ MODIFIER_WORDS = {
     "budget", "affordable", "cheap", "pricey",
     "minimum", "maximum", "max", "min",
     "rating", "rated", "stars", "star",
-    "i", "want", "need", "looking", "for", "find", "show", "me",
+    "i", "am", "want", "need", "looking", "for", "find", "show", "me",
+    "please", "give", "get", "buy", "some", "any",
     "the", "a", "an", "of", "with", "in", "this", "na", "ng", "ang", "yung",
     "paano", "saan", "ano", "may", "gusto", "ko", "hanap",
     "magkano", "pesos", "peso", "php",
@@ -54,22 +55,80 @@ MODIFIER_WORDS = {
     "ranging", "range", "to",
 }
 
+# Filipino keyword → English search term.
+# Applied word-by-word before any other processing so the rest of the
+# pipeline only ever sees English terms.
+_FILIPINO_WORD_MAP: dict[str, str] = {
+    # Food / items
+    "pagkain":  "food",
+    "pagkains": "food",
+    "laruan":   "toys",
+    "laruang":  "toys",
+    "damit":    "clothes",
+    "damits":   "clothes",
+    "sapatos":  "shoes",
+    "medyas":   "socks",
+    "bag":      "bag",
+    "prutas":   "fruits",
+    "gulay":    "vegetables",
+    "karne":    "meat",
+    "isda":     "fish",
+    "tinapay":  "bread",
+    "inumin":   "drinks",
+    "gatas":    "milk",
+    "kape":     "coffee",
+    "asukal":   "sugar",
+    "bigas":    "rice",
+    # Common query words already in MODIFIER_WORDS but include Tagalog forms
+    "hanapin":  "find",
+    "gusto":    "want",
+    "kailangan": "need",
+    "ibigay":   "give",
+}
+
+
+def _apply_filipino_map(query: str) -> str:
+    """Replace known Filipino words with their English equivalents."""
+    words = query.split()
+    result = []
+    for w in words:
+        lower = w.lower()
+        result.append(_FILIPINO_WORD_MAP.get(lower, w))
+    return " ".join(result)
+
 
 _INTENT_RULES: list[tuple] = [
     # ── Clothing + season ────────────────────────────────────────────────────
     # trigger: clothing-related word   category: season keyword
+    # Note: "dress/blouse/skirt/gown" are excluded from the trigger — they are
+    # specific product names protected by _SPECIFIC_ITEM_RE and kept as-is.
     (
-        re.compile(r'\b(dress|dresses|outfit|outfits|wear|wearing|attire|blouse|skirt|skirts|tshirt|t-shirt|top|tops|clothe|clothes|clothing)\b', re.IGNORECASE),
+        re.compile(
+            r'\b(outfit|outfits|wear|wearing|attire|tshirt|t-shirt|shirt|shirts'
+            r'|top|tops|clothe|clothes|clothing|clothings|shorts|jacket|jackets'
+            r'|flip\s+flops?|sleeveless|long\s+sleeve)\b',
+            re.IGNORECASE,
+        ),
         re.compile(r'\bsummer\b', re.IGNORECASE),
         "summer clothes",
     ),
     (
-        re.compile(r'\b(dress|dresses|outfit|outfits|wear|wearing|attire|blouse|skirt|skirts|tshirt|t-shirt|top|tops|clothe|clothes|clothing)\b', re.IGNORECASE),
+        re.compile(
+            r'\b(outfit|outfits|wear|wearing|attire|tshirt|t-shirt|shirt|shirts'
+            r'|top|tops|clothe|clothes|clothing|clothings|shorts|jacket|jackets'
+            r'|flip\s+flops?|sleeveless|long\s+sleeve)\b',
+            re.IGNORECASE,
+        ),
         re.compile(r'\b(rain(y)?|wet)\b', re.IGNORECASE),
         "rainy season clothes",
     ),
     (
-        re.compile(r'\b(dress|dresses|outfit|outfits|wear|wearing|attire|blouse|skirt|skirts|tshirt|t-shirt|top|tops|clothe|clothes|clothing)\b', re.IGNORECASE),
+        re.compile(
+            r'\b(outfit|outfits|wear|wearing|attire|tshirt|t-shirt|shirt|shirts'
+            r'|top|tops|clothe|clothes|clothing|clothings|shorts|jacket|jackets'
+            r'|flip\s+flops?|sleeveless|long\s+sleeve)\b',
+            re.IGNORECASE,
+        ),
         re.compile(r'\b(dry|hot)\b', re.IGNORECASE),
         "dry season clothes",
     ),
@@ -500,70 +559,51 @@ def _merge_rewritten_queries(
         deduped.append(g)
     all_groups = deduped
 
-    # ── Propagate shared price filter to groups that have no price of their own ─
+    # ── Propagate a trailing shared price to all groups ──────────────────────
     #
-    # Only propagate when the groups came from a space-separated split — NOT from
-    # a conjunction split. "toys less than 100 and clothes" explicitly scopes the
-    # price to toys; "food toys less than 150" has a shared trailing price clause.
+    # A "trailing shared price" is when the user wrote one price clause at the
+    # end and meant it to apply to every product, e.g.:
+    #   "toys and snacks below 100"       → both under 100
+    #   "food and toys between 20 and 100" → both in range
+    #   "summer dress and snacks under 300" → both under 300
     #
-    # Detection: if the original query contains a conjunction that produced the
-    # split AND at least one group already has a price (meaning the price was
-    # written next to that specific product), do NOT propagate.
-    # Space-separated splits via _split_space_separated_products re-attach the
-    # price to ALL products before _process_single runs, so all groups from that
-    # path already carry the price — propagation is only needed for groups that
-    # came from a conjunction split where one part had the price and another didn't.
-    # But in a conjunction split, the price was explicitly scoped by the user.
-    # Therefore: never propagate when a conjunction appears in the original query.
-    _CONJUNCTION_RE = re.compile(
-        r'\b(?:and|at\s+saka|tapos|tsaka|pati(?:\s+na)?)\b', re.IGNORECASE
-    )
-    has_conjunction = bool(_CONJUNCTION_RE.search(original_query))
+    # We propagate when ALL of these hold:
+    #   1. Exactly ONE group carries a price (the last split part got it).
+    #   2. ALL other groups have NO price at all.
+    #   3. The groups with prices came from a single shared price value
+    #      (not two different prices like "toys under 200 and snacks under 50").
+    #
+    # We do NOT propagate when multiple groups already have distinct prices —
+    # that means each product was explicitly scoped (already working correctly
+    # because each sub-query carries its own filter after split_compound_query).
 
-    price_maxes = {g.filters["price_max"] for g in all_groups if "price_max" in g.filters}
-    price_mins  = {g.filters["price_min"] for g in all_groups if "price_min" in g.filters}
+    priced_groups   = [g for g in all_groups if "price_max" in g.filters or "price_min" in g.filters]
+    unpriced_groups = [g for g in all_groups if "price_max" not in g.filters and "price_min" not in g.filters]
 
-    if not has_conjunction and len(price_maxes) == 1:
-        shared_max = next(iter(price_maxes))
-        source_is_standalone = any(
-            g.filters.get("price_max") == shared_max and "price_min" not in g.filters
-            for g in all_groups
-        )
-        if source_is_standalone:
-            for g in all_groups:
-                if "price_max" not in g.filters and "price_min" not in g.filters:
-                    g.filters["price_max"] = shared_max
-            print(f"[QueryRewriter] Shared price_max={shared_max} applied to groups with no price")
+    # Only propagate when exactly one group has a price and there are unpriced groups
+    if len(priced_groups) == 1 and unpriced_groups:
+        src = priced_groups[0]
+        shared_max = src.filters.get("price_max")
+        shared_min = src.filters.get("price_min")
 
-    if not has_conjunction and len(price_mins) == 1:
-        shared_min = next(iter(price_mins))
-        source_is_standalone = any(
-            g.filters.get("price_min") == shared_min and "price_max" not in g.filters
-            for g in all_groups
-        )
-        if source_is_standalone:
-            for g in all_groups:
-                if "price_min" not in g.filters and "price_max" not in g.filters:
-                    g.filters["price_min"] = shared_min
-            print(f"[QueryRewriter] Shared price_min={shared_min} applied to groups with no price")
+        if shared_max is not None and shared_min is None:
+            # Single-bound max (e.g. "under 300")
+            for g in unpriced_groups:
+                g.filters["price_max"] = shared_max
+            print(f"[QueryRewriter] Trailing shared price_max={shared_max} propagated to {len(unpriced_groups)} group(s)")
 
-    # ── Propagate a shared between-range to groups with no price at all ───────
-    # Same conjunction guard.
-    between_pairs = {
-        (g.filters["price_min"], g.filters["price_max"])
-        for g in all_groups
-        if "price_min" in g.filters and "price_max" in g.filters
-    }
-    unpriceed_groups = [
-        g for g in all_groups
-        if "price_min" not in g.filters and "price_max" not in g.filters
-    ]
-    if not has_conjunction and len(between_pairs) == 1 and unpriceed_groups:
-        shared_pair_min, shared_pair_max = next(iter(between_pairs))
-        for g in unpriceed_groups:
-            g.filters["price_min"] = shared_pair_min
-            g.filters["price_max"] = shared_pair_max
-        print(f"[QueryRewriter] Shared between-range ({shared_pair_min},{shared_pair_max}) applied to {len(unpriceed_groups)} group(s)")
+        elif shared_min is not None and shared_max is None:
+            # Single-bound min (e.g. "more than 100")
+            for g in unpriced_groups:
+                g.filters["price_min"] = shared_min
+            print(f"[QueryRewriter] Trailing shared price_min={shared_min} propagated to {len(unpriced_groups)} group(s)")
+
+        elif shared_min is not None and shared_max is not None:
+            # Between-range (e.g. "between 50 and 200")
+            for g in unpriced_groups:
+                g.filters["price_min"] = shared_min
+                g.filters["price_max"] = shared_max
+            print(f"[QueryRewriter] Trailing shared between-range ({shared_min},{shared_max}) propagated to {len(unpriced_groups)} group(s)")
 
     # Union of all intents (deduplicated, preserving order)
     merged_intents = list(dict.fromkeys(
@@ -882,6 +922,7 @@ class QueryRewriterService:
 
         Returns RewrittenQuery with search_text, filters, intents, and slots.
         """
+        query = _apply_filipino_map(query)
         sentences = split_sentences(query)
 
         if len(sentences) == 1:
@@ -926,12 +967,24 @@ class QueryRewriterService:
         if self._slot_service and self._slot_service._loaded:
             slot_result = self._slot_service.extract(normalised)
 
-        # When the normalizer rewrote the sentence to a canonical category
-        # (e.g. "seasonal food"), the NER may tag part of that phrase as
-        # PRODUCT1 (e.g. "food"), which would then override the full category
-        # name as search_text. Strip PRODUCT slots so rewrite() falls back to
-        # cleaning the normalised query directly, preserving the full category.
-        if was_normalised:
+        # Strip PRODUCT slots when the sentence resolves to a known intent
+        # category.  The NER often tags only a fragment (e.g. PRODUCT1="items"
+        # from "birthday items", PRODUCT1="dress" from "summer dress under 500"),
+        # which would override the full canonical category name as search_text.
+        #
+        # Three cases all require the strip:
+        #   1. was_normalised — _normalise_seasonal_clothing rewrote the sentence
+        #   2. normalised itself is a known category — arrived pre-normalised
+        #      from split_sentences (e.g. "birthday items", "halal food")
+        #   3. normalised-minus-price-clause is a known category — e.g.
+        #      "summer dress between 100 and 800" → strip price → "summer dress"
+        from models.intent_mappings import match_intent_category
+        price_stripped = _PRICE_CLAUSE_RE.sub("", normalised).strip()
+        sentence_is_known_category = (
+            match_intent_category(normalised) is not None
+            or match_intent_category(price_stripped) is not None
+        )
+        if was_normalised or sentence_is_known_category:
             slot_result["slots"] = {
                 k: v for k, v in slot_result["slots"].items()
                 if not k.startswith("PRODUCT")
