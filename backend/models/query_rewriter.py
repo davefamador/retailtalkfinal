@@ -266,35 +266,11 @@ def _normalise_seasonal_clothing(query: str) -> str:
     # Guard: if the query names a specific clothing item (dress, blouse, skirt, etc.)
     # keep the specific term — don't generalise to "summer/rainy clothes".
     # e.g. "summer dress" should stay "summer dress", not become "summer clothes".
-    # When a season keyword is also present (e.g. "i want dress for summer"),
-    # rewrite to the canonical "{season} {item}" form so the downstream
-    # category lookup (e.g. "summer dress") matches deterministically.
     _SPECIFIC_ITEM_RE = re.compile(
         r'\b(dress|dresses|blouse|blouses|skirt|skirts|gown|gowns|polo|polos)\b',
         re.IGNORECASE,
     )
-    _SEASON_RE = re.compile(r'\b(summer|rainy|rain|wet|dry|hot)\b', re.IGNORECASE)
-    _SEASON_NORMALISE = {
-        "summer": "summer", "rainy": "rainy", "rain": "rainy",
-        "wet": "rainy", "dry": "dry", "hot": "summer",
-    }
-    _ITEM_NORMALISE = {
-        "dress": "dress", "dresses": "dress",
-        "blouse": "blouse", "blouses": "blouse",
-        "skirt": "skirt", "skirts": "skirt",
-        "gown": "gown", "gowns": "gown",
-        "polo": "polo", "polos": "polo",
-    }
-    item_match = _SPECIFIC_ITEM_RE.search(query_for_match)
-    if item_match:
-        season_match = _SEASON_RE.search(query_for_match)
-        if season_match:
-            from models.intent_mappings import _INTENT_CATEGORIES_LOWER
-            season = _SEASON_NORMALISE[season_match.group(1).lower()]
-            item = _ITEM_NORMALISE[item_match.group(1).lower()]
-            canonical = f"{season} {item}"
-            if canonical in _INTENT_CATEGORIES_LOWER:
-                return f"{canonical}{price_clause}"
+    if _SPECIFIC_ITEM_RE.search(query_for_match):
         return query
 
     for trigger_pat, category_pat, canonical in _INTENT_RULES:
