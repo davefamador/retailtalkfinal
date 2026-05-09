@@ -295,7 +295,7 @@ export default function DeliveryPage() {
                     padding: '20px 20px 16px', textDecoration: 'none',
                     borderBottom: '1px solid var(--border-color)',
                 }}>
-                    <img src="/logo.png" alt="RetailTalk" style={{ height: 28, width: 28 }} />
+                    <img src="/logo.png?v=3" alt="RetailTalk" style={{ height: 28, width: 28 }} />
                     <span style={{ fontWeight: 800, fontSize: '1.1rem', color: 'var(--text-primary)', fontFamily: 'Inter, sans-serif' }}>RetailTalk</span>
                 </a>
 

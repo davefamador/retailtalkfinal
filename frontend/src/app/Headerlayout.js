@@ -49,7 +49,12 @@ export default function RootLayout({ children }) {
         <>
             {!hideNav && <nav className="navbar">
                     <a href="/" className="navbar-brand" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                        <img src="/logo.png" alt="RetailTalk Logo" style={{ height: '32px', width: '32px' }} />
+                        <img
+                            src="/logo.png?v=3"
+                            alt="RetailTalk Logo"
+                            style={{ height: '32px', width: '32px' }}
+                            onError={(e) => { e.currentTarget.style.display = 'none'; }}
+                        />
                         RetailTalk
                     </a>
 

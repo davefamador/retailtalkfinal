@@ -701,7 +701,7 @@ export default function ManagerDashboard() {
                     borderBottom: '1px solid var(--border-color)',
                     display: 'flex', alignItems: 'center', gap: 10,
                 }}>
-                    <img src="/logo.png" alt="RetailTalk" style={{ width: 40, height: 40, borderRadius: 10 }} />
+                    <img src="/logo.png?v=3" alt="RetailTalk" style={{ width: 40, height: 40, borderRadius: 10 }} />
                     <div style={{ flex: 1 }}>
                         <div style={{ fontWeight: 800, fontSize: '1rem', color: 'var(--text-primary)' }}>RetailTalk</div>
                         <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>Manager</div>

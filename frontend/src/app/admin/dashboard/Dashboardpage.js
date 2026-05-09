@@ -1743,7 +1743,7 @@ export default function AdminDashboard() {
                     justifyContent: sidebarCollapsed ? 'center' : 'flex-start',
                     minHeight: 56,
                 }}>
-                    <img src="/logo.png" alt="RetailTalk" onClick={() => setSidebarCollapsed(!sidebarCollapsed)} title={sidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar'} style={{ width: 34, height: 34, borderRadius: 10, cursor: 'pointer', flexShrink: 0 }} />
+                    <img src="/logo.png?v=3" alt="RetailTalk" onClick={() => setSidebarCollapsed(!sidebarCollapsed)} title={sidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar'} style={{ width: 34, height: 34, borderRadius: 10, cursor: 'pointer', flexShrink: 0 }} />
                     {!sidebarCollapsed && (
                         <div style={{ flex: 1, minWidth: 0 }}>
                             <div style={{ fontWeight: 800, fontSize: '0.95rem', color: 'var(--admin-text)' }}>RetailTalk</div>
