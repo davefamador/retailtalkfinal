@@ -269,11 +269,11 @@ INTENT_CATEGORIES = {
                   "shirt", "casual sleeveless tops", "Sarouel Pants", "Jacket",
                   "Keffiyeh", "Long Sleeve", "Summer Hat", "Hat","pants"],
     "shirts": ["shirt", "casual sleeveless tops", "Sarouel Pants", "Jacket",
-                  "Keffiyeh", "Long Sleeve", "pants"],
+                  "Keffiyeh", "Long Sleeve", "Summer Hat", "pants"],
     "shirt": ["shirt", "casual sleeveless tops", "Jacket",
-                  "Keffiyeh", "Long Sleeve", "pants"],
+                  "Keffiyeh", "Long Sleeve", "Summer Hat","pants"],
     "t shirt": ["shirt", "casual sleeveless tops", "Jacket",
-                  "Keffiyeh", "Long Sleeve","pants"],
+                  "Keffiyeh", "Long Sleeve", "pants"],
     "t-shirt": ["shirt", "casual sleeveless tops", "Jacket",
                   "Keffiyeh", "Long Sleeve","pants"],
     "t-shirts": ["shirt", "casual sleeveless tops", "Jacket",
@@ -355,7 +355,7 @@ INTENT_CATEGORIES = {
                         "Jacket", "Keffiyeh", "Long Sleeve", "Summer Hat", "Hat"],
     "summer":          ["shorts", "flip flops", "shirt", "Sarouel Pants",
                         "Jacket", "Keffiyeh", "Long Sleeve", "Summer Hat", "Hat"],
-    
+
     # Summer food (also handled by SUMMER_FOOD_KEYWORDS; listed here so
     # _split_space_separated_products can recognise the 2-word span)
     "summer food":         ["Beef Rendang", "Biko", "Binignit", "Buko Juice", "Escabeche",

@@ -636,6 +636,13 @@ export default function AdminDashboard() {
     const [inventorySearch, setInventorySearch] = useState('');
     const [lowStockStoreModal, setLowStockStoreModal] = useState(null);
     const [lowStockStoreLoading, setLowStockStoreLoading] = useState(false);
+    // Inventory product modal (restock + history)
+    const [inventoryModal, setInventoryModal] = useState(null);
+    const [inventoryHistory, setInventoryHistory] = useState(null);
+    const [inventoryHistoryLoading, setInventoryHistoryLoading] = useState(false);
+    const [inventoryHistoryTab, setInventoryHistoryTab] = useState('stock');
+    const [inventoryRestockQty, setInventoryRestockQty] = useState('');
+    const [inventoryRestockMsg, setInventoryRestockMsg] = useState('');
     // Restock request modal state
     const [restockModal, setRestockModal] = useState(null);
     const [restockQty, setRestockQty] = useState('');
@@ -801,6 +808,27 @@ export default function AdminDashboard() {
         try { setWishlistReport(await getAdminWishlistReport()); } catch (e) { console.error(e); }
         finally { setWishlistLoading(false); }
     };
+
+    const loadInventoryHistory = async (productId) => {
+        setInventoryHistoryLoading(true);
+        setInventoryHistory(null);
+        try {
+            const { adminGetProductHistory } = await import('../../../lib/api');
+            const data = await adminGetProductHistory(productId);
+            setInventoryHistory(data);
+        } catch (e) { console.error(e); }
+        finally { setInventoryHistoryLoading(false); }
+    };
+
+    useEffect(() => {
+        if (inventoryModal?.id) {
+            setInventoryHistoryTab('stock');
+            loadInventoryHistory(inventoryModal.id);
+        } else {
+            setInventoryHistory(null);
+        }
+    }, [inventoryModal?.id]);
+
     // Salary functions
     const loadSalaries = async () => {
         setSalaryLoading(true);
@@ -877,6 +905,313 @@ export default function AdminDashboard() {
     const loadReports = async () => {
         try { setReports(await adminGetReports()); } catch (e) { console.error(e); }
     };
+
+    // ── PDF Report Generation ────────────────────────────
+    const generatePDFReport = async () => {
+        if (!reports) return;
+
+        const jsPDFModule = await import('jspdf');
+        const jsPDF = jsPDFModule.default;
+        const autoTableModule = await import('jspdf-autotable');
+        const autoTable = autoTableModule.default;
+
+        const doc = new jsPDF('p', 'mm', 'a4');
+        const pageW = doc.internal.pageSize.getWidth();
+        const pageH = doc.internal.pageSize.getHeight();
+        const margin = 15;
+        const contentW = pageW - margin * 2;
+
+        // Blue color palette
+        const blue = { dark: [15, 40, 92], primary: [30, 64, 175], medium: [59, 130, 246], light: [191, 219, 254], bg: [239, 246, 255], white: [255, 255, 255] };
+
+        // ── Helper: Add page footer ──
+        const addFooter = (pageNum, totalPages) => {
+            doc.setFontSize(8);
+            doc.setTextColor(150, 150, 150);
+            doc.text(`Page ${pageNum} of ${totalPages}`, pageW / 2, pageH - 8, { align: 'center' });
+            doc.text('RetailTalk Admin Report — Confidential', margin, pageH - 8);
+        };
+
+        // ── Helper: Draw rounded rect ──
+        const drawRoundedRect = (x, y, w, h, r, fillColor) => {
+            doc.setFillColor(...fillColor);
+            doc.roundedRect(x, y, w, h, r, r, 'F');
+        };
+
+        // ═══════════════════════════════════════════
+        // PAGE 1: Header + Summary + Store Breakdown
+        // ═══════════════════════════════════════════
+
+        // ── Full-width blue header ──
+        drawRoundedRect(0, 0, pageW, 48, 0, blue.dark);
+        // Accent line
+        doc.setFillColor(...blue.medium);
+        doc.rect(0, 48, pageW, 2, 'F');
+
+        // Header text
+        doc.setFont('helvetica', 'bold');
+        doc.setFontSize(22);
+        doc.setTextColor(...blue.white);
+        doc.text('RetailTalk', margin, 20);
+        doc.setFontSize(11);
+        doc.setFont('helvetica', 'normal');
+        doc.setTextColor(...blue.light);
+        doc.text('Financial Report', margin, 28);
+
+        // Generated date & admin info
+        const now = new Date();
+        const dateStr = now.toLocaleDateString('en-PH', { year: 'numeric', month: 'long', day: 'numeric' });
+        const timeStr = now.toLocaleTimeString('en-PH', { hour: '2-digit', minute: '2-digit' });
+        doc.setFontSize(9);
+        doc.setTextColor(180, 200, 230);
+        doc.text(`Generated: ${dateStr}, ${timeStr}`, pageW - margin, 20, { align: 'right' });
+        doc.text(`From: Admin`, pageW - margin, 28, { align: 'right' });
+        doc.setFontSize(8);
+        doc.text('All time', margin, 38);
+
+        let y = 58;
+
+        // ── DATA SUMMARY section ──
+        drawRoundedRect(margin, y, contentW, 10, 2, blue.primary);
+        doc.setFont('helvetica', 'bold');
+        doc.setFontSize(10);
+        doc.setTextColor(...blue.white);
+        doc.text('  DATA SUMMARY', margin + 4, y + 7);
+        y += 14;
+
+        // Summary rows
+        const summaryData = [
+            ['Total Revenue', `PHP ${reports.total_revenue.toFixed(2)}`],
+            ['Overall Expected Revenue', `PHP ${(reports.overall_expected_revenue || 0).toFixed(2)}`],
+            ['Total Orders', `${reports.total_orders}`],
+            ['Average Order Value', `PHP ${reports.avg_transaction_value.toFixed(2)}`],
+            ['Total Sales Volume', `PHP ${reports.total_sales_volume.toFixed(2)}`],
+        ];
+
+        summaryData.forEach(([label, value], i) => {
+            const rowBg = i % 2 === 0 ? blue.bg : blue.white;
+            drawRoundedRect(margin, y, contentW, 10, 0, rowBg);
+            doc.setFont('helvetica', 'normal');
+            doc.setFontSize(9);
+            doc.setTextColor(30, 30, 60);
+            doc.text(label, margin + 6, y + 7);
+            doc.setFont('helvetica', 'bold');
+            doc.text(value, pageW - margin - 6, y + 7, { align: 'right' });
+            y += 10;
+        });
+
+        y += 12;
+
+        // ── STORE REVENUE BREAKDOWN ──
+        if (reports.store_reports && reports.store_reports.length > 0) {
+            drawRoundedRect(margin, y, contentW, 10, 2, blue.primary);
+            doc.setFont('helvetica', 'bold');
+            doc.setFontSize(10);
+            doc.setTextColor(...blue.white);
+            doc.text('  STORE REVENUE BREAKDOWN', margin + 4, y + 7);
+            y += 12;
+
+            const storeTableHead = [['Store Name', 'Expected Revenue', 'Current Revenue', 'Fulfillment']];
+            const storeTableBody = reports.store_reports.map(s => {
+                const pct = s.expected_revenue > 0 ? ((s.current_revenue / s.expected_revenue) * 100).toFixed(1) + '%' : '—';
+                return [s.store_name, `PHP ${(s.expected_revenue || 0).toFixed(2)}`, `PHP ${(s.current_revenue || 0).toFixed(2)}`, pct];
+            });
+
+            autoTable(doc, {
+                head: storeTableHead,
+                body: storeTableBody,
+                startY: y,
+                margin: { left: margin, right: margin },
+                styles: {
+                    fontSize: 8.5,
+                    cellPadding: 4,
+                    lineColor: [220, 230, 245],
+                    lineWidth: 0.3,
+                    textColor: [30, 30, 60],
+                },
+                headStyles: {
+                    fillColor: blue.medium,
+                    textColor: blue.white,
+                    fontStyle: 'bold',
+                    fontSize: 8.5,
+                },
+                alternateRowStyles: {
+                    fillColor: blue.bg,
+                },
+                columnStyles: {
+                    1: { halign: 'right' },
+                    2: { halign: 'right' },
+                    3: { halign: 'center' },
+                },
+            });
+
+            y = doc.lastAutoTable.finalY + 12;
+        }
+
+        // ── Check if enough space for top sellers, else new page ──
+        if (y > pageH - 80) {
+            doc.addPage();
+            y = 20;
+        }
+
+        // ── TOP SELLERS ──
+        if (reports.top_sellers && reports.top_sellers.length > 0) {
+            drawRoundedRect(margin, y, contentW, 10, 2, blue.primary);
+            doc.setFont('helvetica', 'bold');
+            doc.setFontSize(10);
+            doc.setTextColor(...blue.white);
+            doc.text('  TOP SELLERS', margin + 4, y + 7);
+            y += 12;
+
+            const sellerHead = [['#', 'Seller Name', 'Total Sales', 'Orders']];
+            const sellerBody = reports.top_sellers.map((s, i) => [
+                `${i + 1}`, s.seller_name, `PHP ${s.total_sales.toFixed(2)}`, `${s.transaction_count}`
+            ]);
+
+            autoTable(doc, {
+                head: sellerHead,
+                body: sellerBody,
+                startY: y,
+                margin: { left: margin, right: margin },
+                styles: {
+                    fontSize: 8.5,
+                    cellPadding: 4,
+                    lineColor: [220, 230, 245],
+                    lineWidth: 0.3,
+                    textColor: [30, 30, 60],
+                },
+                headStyles: {
+                    fillColor: blue.medium,
+                    textColor: blue.white,
+                    fontStyle: 'bold',
+                    fontSize: 8.5,
+                },
+                alternateRowStyles: {
+                    fillColor: blue.bg,
+                },
+                columnStyles: {
+                    0: { halign: 'center', cellWidth: 12 },
+                    2: { halign: 'right' },
+                    3: { halign: 'center' },
+                },
+            });
+
+            y = doc.lastAutoTable.finalY + 12;
+        }
+
+        // ── Check if enough space for top products, else new page ──
+        if (y > pageH - 80) {
+            doc.addPage();
+            y = 20;
+        }
+
+        // ── TOP PRODUCTS ──
+        if (reports.top_products && reports.top_products.length > 0) {
+            drawRoundedRect(margin, y, contentW, 10, 2, blue.primary);
+            doc.setFont('helvetica', 'bold');
+            doc.setFontSize(10);
+            doc.setTextColor(...blue.white);
+            doc.text('  TOP PRODUCTS', margin + 4, y + 7);
+            y += 12;
+
+            const productHead = [['#', 'Product Title', 'Times Sold', 'Total Revenue']];
+            const productBody = reports.top_products.map((p, i) => [
+                `${i + 1}`, p.product_title, `${p.times_sold}x`, `PHP ${p.total_revenue.toFixed(2)}`
+            ]);
+
+            autoTable(doc, {
+                head: productHead,
+                body: productBody,
+                startY: y,
+                margin: { left: margin, right: margin },
+                styles: {
+                    fontSize: 8.5,
+                    cellPadding: 4,
+                    lineColor: [220, 230, 245],
+                    lineWidth: 0.3,
+                    textColor: [30, 30, 60],
+                },
+                headStyles: {
+                    fillColor: blue.medium,
+                    textColor: blue.white,
+                    fontStyle: 'bold',
+                    fontSize: 8.5,
+                },
+                alternateRowStyles: {
+                    fillColor: blue.bg,
+                },
+                columnStyles: {
+                    0: { halign: 'center', cellWidth: 12 },
+                    2: { halign: 'center' },
+                    3: { halign: 'right' },
+                },
+            });
+
+            y = doc.lastAutoTable.finalY + 12;
+        }
+
+        // ── Check if enough space for product reports, else new page ──
+        if (reports.product_reports && reports.product_reports.length > 0) {
+            if (y > pageH - 80) {
+                doc.addPage();
+                y = 20;
+            }
+
+            drawRoundedRect(margin, y, contentW, 10, 2, blue.primary);
+            doc.setFont('helvetica', 'bold');
+            doc.setFontSize(10);
+            doc.setTextColor(...blue.white);
+            doc.text('  PRODUCT REVENUE DETAILS', margin + 4, y + 7);
+            y += 12;
+
+            const prodReportHead = [['Product Title', 'Store', 'Expected Revenue', 'Current Revenue']];
+            const prodReportBody = reports.product_reports.map(p => [
+                p.product_title,
+                p.store_name,
+                `PHP ${(p.expected_revenue || 0).toFixed(2)}`,
+                `PHP ${(p.current_revenue || 0).toFixed(2)}`
+            ]);
+
+            autoTable(doc, {
+                head: prodReportHead,
+                body: prodReportBody,
+                startY: y,
+                margin: { left: margin, right: margin },
+                styles: {
+                    fontSize: 8,
+                    cellPadding: 3.5,
+                    lineColor: [220, 230, 245],
+                    lineWidth: 0.3,
+                    textColor: [30, 30, 60],
+                },
+                headStyles: {
+                    fillColor: blue.medium,
+                    textColor: blue.white,
+                    fontStyle: 'bold',
+                    fontSize: 8,
+                },
+                alternateRowStyles: {
+                    fillColor: blue.bg,
+                },
+                columnStyles: {
+                    2: { halign: 'right' },
+                    3: { halign: 'right' },
+                },
+            });
+        }
+
+        // ── Add footers to all pages ──
+        const totalPages = doc.internal.getNumberOfPages();
+        for (let i = 1; i <= totalPages; i++) {
+            doc.setPage(i);
+            addFooter(i, totalPages);
+        }
+
+        // ── Save the PDF ──
+        const filename = `RetailTalk_Financial_Report_${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}.pdf`;
+        doc.save(filename);
+    };
+
     const loadProducts = async (search = '') => {
         try { setProducts(await adminGetProducts(search)); } catch (e) { console.error(e); }
     };
@@ -1102,10 +1437,33 @@ export default function AdminDashboard() {
         finally { setRemovalLoading(false); }
     };
     const handleLowStockClick = (product) => {
-        setRestockModal(product);
-        setRestockQty('');
-        setRestockMessage('');
+        setInventoryModal(product);
+        setInventoryRestockQty('');
+        setInventoryRestockMsg('');
     };
+
+    const handleInventoryRestockSubmit = async () => {
+        if (!inventoryModal || !inventoryRestockQty) {
+            setMessage({ type: 'error', text: 'Please enter a quantity to restock' });
+            return;
+        }
+        try {
+            const { adminCreateRestockRequest } = await import('../../../lib/api');
+            await adminCreateRestockRequest({
+                product_id: inventoryModal.id,
+                requested_quantity: parseInt(inventoryRestockQty),
+                notes: inventoryRestockMsg || '',
+            });
+            setMessage({ type: 'success', text: `Restock request submitted for ${inventoryModal.title}` });
+            setInventoryRestockQty('');
+            setInventoryRestockMsg('');
+            loadInventoryHistory(inventoryModal.id);
+            loadProducts();
+        } catch (e) {
+            setMessage({ type: 'error', text: 'Failed to submit restock: ' + e.message });
+        }
+    };
+
     const handleSubmitRestock = async () => {
         if (!restockModal || !restockQty) {
             setMessage({ type: 'error', text: 'Please enter requested stock quantity' });
@@ -3674,6 +4032,23 @@ export default function AdminDashboard() {
                         <div>
                             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24 }}>
                                 <h1 style={{ fontSize: '1.5rem', fontWeight: 800 }}>Financial Reports</h1>
+                                {reports && (
+                                    <button
+                                        onClick={() => generatePDFReport()}
+                                        style={{
+                                            display: 'flex', alignItems: 'center', gap: 8,
+                                            padding: '10px 20px', borderRadius: 10, border: 'none',
+                                            background: 'linear-gradient(135deg, #1e40af, #3b82f6)',
+                                            color: '#fff', fontWeight: 700, fontSize: '0.85rem',
+                                            cursor: 'pointer', boxShadow: '0 4px 14px rgba(59,130,246,0.35)',
+                                            transition: 'all 0.2s',
+                                        }}
+                                        onMouseOver={(e) => e.currentTarget.style.transform = 'translateY(-1px)'}
+                                        onMouseOut={(e) => e.currentTarget.style.transform = 'translateY(0)'}
+                                    >
+                                        <Download size={16} /> Generate PDF Report
+                                    </button>
+                                )}
                             </div>
                             {reports ? (
                                 <>
@@ -5259,6 +5634,166 @@ export default function AdminDashboard() {
                     </div>
                 </div>
             )}
+
+            {/* ===== INVENTORY PRODUCT MODAL (restock + history) ===== */}
+            {inventoryModal && (() => {
+                const p = inventoryModal;
+                const isOut = p.stock === 0;
+                const isLow = p.stock > 0 && p.stock <= 5;
+                const kindLabel = (item) => {
+                    if (item._kind === 'purchase') return `Sold to ${item.changed_by_name} — ${item.old_stock} → ${item.new_stock}`;
+                    if (item._kind === 'restock_delivered') return `Delivery by ${item.changed_by_name} — ${item.old_stock} → ${item.new_stock}`;
+                    if (item._kind === 'restock') return `Restock request by ${item.requested_by}`;
+                    return `Edited by ${item.changed_by_name} — ${item.old_stock} → ${item.new_stock}`;
+                };
+                const kindBadge = (k) => ({ purchase: 'Sale', restock_delivered: 'Delivered', restock: 'Request', admin_update: 'Admin Edit' }[k] || 'Edit');
+                const kindColor = (k) => ({ purchase: '#10b981', restock_delivered: '#10b981', restock: '#f59e0b' }[k] || '#6366f1');
+                const statusColor = s => ({ completed: '#10b981', delivered: '#10b981', approved: '#6366f1', pending: '#f59e0b', cancelled: '#ef4444', ondeliver: '#8b5cf6' }[s] || '#6b7280');
+                return (
+                    <>
+                        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', zIndex: 400 }} onClick={() => setInventoryModal(null)} />
+                        <div style={{ position: 'fixed', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 401, padding: 20, pointerEvents: 'none' }}>
+                            <div style={{
+                                background: 'var(--admin-bg)', borderRadius: 20, width: '92vw', maxWidth: 560,
+                                maxHeight: '90vh', overflowY: 'auto', boxShadow: '0 25px 60px rgba(0,0,0,0.4)',
+                                border: '1px solid var(--admin-border)', pointerEvents: 'auto',
+                                animation: 'fadeScaleIn 0.2s ease-out', padding: 28,
+                            }} onClick={e => e.stopPropagation()}>
+
+                                {/* Header */}
+                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 20 }}>
+                                    <div style={{ display: 'flex', gap: 14, alignItems: 'center' }}>
+                                        {p.images && p.images.length > 0
+                                            ? <img src={p.images[0]} alt="" style={{ width: 52, height: 52, borderRadius: 10, objectFit: 'cover', flexShrink: 0 }} />
+                                            : <div style={{ width: 52, height: 52, borderRadius: 10, background: 'rgba(99,102,241,0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}><Package size={24} style={{ color: '#6366f1' }} /></div>
+                                        }
+                                        <div>
+                                            <h2 style={{ fontSize: '1.05rem', fontWeight: 800, marginBottom: 2 }}>{p.title}</h2>
+                                            <p style={{ color: 'var(--admin-text-muted)', fontSize: '0.78rem', margin: 0 }}>
+                                                <Store size={11} style={{ marginRight: 4, verticalAlign: 'middle' }} />{p.seller_name}
+                                            </p>
+                                        </div>
+                                    </div>
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexShrink: 0 }}>
+                                        <span style={{
+                                            padding: '4px 12px', borderRadius: 8, fontSize: '0.78rem', fontWeight: 700,
+                                            background: isOut ? 'rgba(239,68,68,0.15)' : isLow ? 'rgba(245,158,11,0.15)' : 'rgba(16,185,129,0.1)',
+                                            color: isOut ? '#ef4444' : isLow ? '#f59e0b' : '#10b981',
+                                        }}>{isOut ? 'Out of Stock' : `${p.stock} in stock`}</span>
+                                        <button onClick={() => setInventoryModal(null)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--admin-text-muted)' }}><X size={20} /></button>
+                                    </div>
+                                </div>
+
+                                {/* Restock Form */}
+                                <div style={{ background: 'var(--admin-card-bg)', borderRadius: 12, border: '1px solid var(--admin-border)', padding: 18, marginBottom: 20 }}>
+                                    <p style={{ fontWeight: 700, fontSize: '0.85rem', marginBottom: 14, display: 'flex', alignItems: 'center', gap: 6 }}>
+                                        <AlertTriangle size={15} style={{ color: '#f59e0b' }} /> Restock Request
+                                    </p>
+                                    <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+                                        <div>
+                                            <label style={{ display: 'block', fontSize: '0.78rem', fontWeight: 600, color: 'var(--admin-text-muted)', marginBottom: 6, textTransform: 'uppercase' }}>Quantity to Request *</label>
+                                            <input type="number" min="1" placeholder="Enter quantity"
+                                                value={inventoryRestockQty} onChange={e => setInventoryRestockQty(e.target.value)}
+                                                style={{ width: '100%', padding: '10px 14px', borderRadius: 10, border: '2px solid var(--admin-border)', background: 'var(--admin-bg)', color: 'var(--admin-text)', fontFamily: 'Inter, sans-serif', fontSize: '0.9rem', fontWeight: 600 }}
+                                                onFocus={e => e.target.style.borderColor = '#f59e0b'} onBlur={e => e.target.style.borderColor = 'var(--admin-border)'} />
+                                        </div>
+                                        <div>
+                                            <label style={{ display: 'block', fontSize: '0.78rem', fontWeight: 600, color: 'var(--admin-text-muted)', marginBottom: 6, textTransform: 'uppercase' }}>Notes (optional)</label>
+                                            <textarea placeholder="Add a note..." rows={2} value={inventoryRestockMsg} onChange={e => setInventoryRestockMsg(e.target.value)}
+                                                style={{ width: '100%', padding: '10px 14px', borderRadius: 10, border: '2px solid var(--admin-border)', background: 'var(--admin-bg)', color: 'var(--admin-text)', fontFamily: 'Inter, sans-serif', fontSize: '0.85rem', resize: 'vertical' }}
+                                                onFocus={e => e.target.style.borderColor = '#f59e0b'} onBlur={e => e.target.style.borderColor = 'var(--admin-border)'} />
+                                        </div>
+                                        <button onClick={handleInventoryRestockSubmit} disabled={!inventoryRestockQty} style={{
+                                            width: '100%', padding: '11px 0', borderRadius: 10, border: 'none',
+                                            background: inventoryRestockQty ? 'linear-gradient(135deg, #f59e0b, #d97706)' : 'rgba(245,158,11,0.2)',
+                                            color: inventoryRestockQty ? '#fff' : 'var(--admin-text-muted)',
+                                            fontWeight: 700, fontSize: '0.88rem', fontFamily: 'Inter, sans-serif',
+                                            cursor: inventoryRestockQty ? 'pointer' : 'not-allowed',
+                                            display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
+                                        }}>
+                                            <Send size={14} /> Submit Restock Request
+                                        </button>
+                                    </div>
+                                </div>
+
+                                {/* History tabs */}
+                                <div>
+                                    <div style={{ display: 'flex', gap: 6, marginBottom: 14 }}>
+                                        {[{ key: 'stock', label: 'Stock Changes' }, { key: 'buyers', label: 'Buyer Orders' }].map(t => (
+                                            <button key={t.key} onClick={() => setInventoryHistoryTab(t.key)} style={{
+                                                padding: '6px 14px', borderRadius: 8, border: 'none', cursor: 'pointer',
+                                                fontWeight: 600, fontSize: '0.78rem', fontFamily: 'Inter, sans-serif',
+                                                background: inventoryHistoryTab === t.key ? 'var(--admin-accent)' : 'var(--admin-hover)',
+                                                color: inventoryHistoryTab === t.key ? '#fff' : 'var(--admin-text-muted)',
+                                            }}>{t.label}</button>
+                                        ))}
+                                    </div>
+
+                                    {inventoryHistoryLoading ? (
+                                        <div style={{ textAlign: 'center', padding: '20px 0', color: 'var(--admin-text-muted)', fontSize: '0.85rem' }}>Loading history...</div>
+                                    ) : inventoryHistoryTab === 'stock' ? (() => {
+                                        const stockH = inventoryHistory?.stock_history || [];
+                                        const restockH = (inventoryHistory?.restock_history || []).filter(r => r.status !== 'delivered');
+                                        const combined = [
+                                            ...stockH.map(s => ({ ...s, _kind: s.change_type || 'admin_update' })),
+                                            ...restockH.map(r => ({ ...r, _kind: 'restock' })),
+                                        ].sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+                                        return combined.length === 0 ? (
+                                            <p style={{ color: 'var(--admin-text-muted)', fontSize: '0.82rem', textAlign: 'center', padding: '16px 0' }}>No stock changes recorded yet.</p>
+                                        ) : (
+                                            <div style={{ display: 'flex', flexDirection: 'column', gap: 8, maxHeight: 280, overflowY: 'auto' }}>
+                                                {combined.map((item, idx) => {
+                                                    const delta = item._kind === 'restock' ? item.quantity : (item.new_stock - item.old_stock);
+                                                    const positive = delta > 0;
+                                                    const color = kindColor(item._kind);
+                                                    return (
+                                                        <div key={item.id || idx} style={{ display: 'flex', gap: 10, alignItems: 'flex-start', padding: '10px 12px', borderRadius: 8, background: 'var(--admin-card-bg)', border: `1px solid ${color}33` }}>
+                                                            <div style={{ fontWeight: 800, fontSize: '0.9rem', minWidth: 36, textAlign: 'right', color: positive ? '#10b981' : '#ef4444', flexShrink: 0, paddingTop: 2 }}>{positive ? '+' : ''}{delta}</div>
+                                                            <div style={{ flex: 1, minWidth: 0 }}>
+                                                                <div style={{ display: 'flex', alignItems: 'center', gap: 5, marginBottom: 3 }}>
+                                                                    <span style={{ fontSize: '0.63rem', fontWeight: 700, padding: '1px 7px', borderRadius: 4, background: `${color}22`, color, textTransform: 'uppercase', letterSpacing: '0.3px' }}>
+                                                                        {kindBadge(item._kind)}
+                                                                    </span>
+                                                                </div>
+                                                                <div style={{ fontWeight: 600, fontSize: '0.79rem' }}>{kindLabel(item)}</div>
+                                                                {item.notes && <div style={{ fontSize: '0.72rem', color: 'var(--admin-text-muted)', marginTop: 2 }}>{item.notes}</div>}
+                                                                <div style={{ fontSize: '0.71rem', color: 'var(--admin-text-muted)', marginTop: 3 }}>{new Date(item.created_at).toLocaleString()}</div>
+                                                            </div>
+                                                        </div>
+                                                    );
+                                                })}
+                                            </div>
+                                        );
+                                    })() : (() => {
+                                        const txns = inventoryHistory?.transactions || [];
+                                        return txns.length === 0 ? (
+                                            <p style={{ color: 'var(--admin-text-muted)', fontSize: '0.82rem', textAlign: 'center', padding: '16px 0' }}>No purchases yet for this product.</p>
+                                        ) : (
+                                            <div style={{ display: 'flex', flexDirection: 'column', gap: 8, maxHeight: 280, overflowY: 'auto' }}>
+                                                {txns.map((t, idx) => (
+                                                    <div key={t.id || idx} style={{ display: 'flex', gap: 10, alignItems: 'center', padding: '10px 12px', borderRadius: 8, background: 'var(--admin-card-bg)', border: '1px solid var(--admin-border)' }}>
+                                                        <div style={{ flex: 1, minWidth: 0 }}>
+                                                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                                                <span style={{ fontWeight: 600, fontSize: '0.8rem', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{t.buyer_name}</span>
+                                                                <span style={{ fontWeight: 700, fontSize: '0.82rem', color: 'var(--admin-accent)', flexShrink: 0, marginLeft: 8 }}>PHP {t.amount.toFixed(2)}</span>
+                                                            </div>
+                                                            <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginTop: 3 }}>
+                                                                <span style={{ fontSize: '0.72rem', color: 'var(--admin-text-muted)' }}>Qty: {t.quantity}</span>
+                                                                <span style={{ fontSize: '0.67rem', fontWeight: 700, padding: '1px 6px', borderRadius: 4, background: `${statusColor(t.status)}22`, color: statusColor(t.status), textTransform: 'capitalize' }}>{t.status}</span>
+                                                                <span style={{ fontSize: '0.71rem', color: 'var(--admin-text-muted)' }}>{new Date(t.created_at).toLocaleString()}</span>
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        );
+                                    })()}
+                                </div>
+                            </div>
+                        </div>
+                    </>
+                );
+            })()}
 
             {/* ===== CONFIRM DIALOG ===== */}
             {confirmDialog && (

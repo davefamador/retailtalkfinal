@@ -234,6 +234,18 @@ async def buy_product(req: BuyRequest, current_user: dict = Depends(get_current_
     new_stock = current_stock - req.quantity
     sb.table("products").update({"stock": new_stock}).eq("id", req.product_id).execute()
 
+    # Log stock change caused by purchase
+    buyer_name = user_data.get("full_name", "Buyer")
+    sb.table("stock_history").insert({
+        "product_id": req.product_id,
+        "changed_by": user_id,
+        "changed_by_name": buyer_name,
+        "old_stock": current_stock,
+        "new_stock": new_stock,
+        "change_type": "purchase",
+        "notes": f"Purchased {req.quantity} unit(s)",
+    }).execute()
+
     # 9. Create product_transaction record
     txn_result = sb.table("product_transactions").insert({
         "buyer_id": user_id,

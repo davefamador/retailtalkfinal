@@ -57,6 +57,11 @@ export default function ProductsPage() {
     const [user, setUser] = useState(null);
     const [usingDemo, setUsingDemo] = useState(false);
 
+    const [browseSearch, setBrowseSearch] = useState('');
+    const [activeSearch, setActiveSearch] = useState('');
+
+    const triggerSearch = () => setActiveSearch(browseSearch.trim());
+
     // Modal state
     const [selectedProduct, setSelectedProduct] = useState(null);
 
@@ -105,9 +110,39 @@ export default function ProductsPage() {
 
     return (
         <div className="page">
-            <div className="page-header">
-                <h1>Browse Products</h1>
-                <p>Discover products from our marketplace</p>
+            <div className="page-header" style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', flexWrap: 'wrap', gap: 16 }}>
+                <div>
+                    <h1>Browse Products</h1>
+                    <p>Discover products from our marketplace</p>
+                </div>
+                <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                    <input
+                        type="text"
+                        placeholder="Search by product or store..."
+                        value={browseSearch}
+                        onChange={e => setBrowseSearch(e.target.value)}
+                        onKeyDown={e => e.key === 'Enter' && triggerSearch()}
+                        style={{
+                            padding: '10px 16px', borderRadius: 10, border: '1px solid var(--border-color)',
+                            background: 'var(--bg-card)', color: 'var(--text-primary)',
+                            fontFamily: 'inherit', fontSize: '0.9rem', width: 240,
+                            outline: 'none',
+                        }}
+                        onFocus={e => e.target.style.borderColor = 'var(--accent-primary)'}
+                        onBlur={e => e.target.style.borderColor = 'var(--border-color)'}
+                    />
+                    <button
+                        onClick={triggerSearch}
+                        style={{
+                            padding: '10px 20px', borderRadius: 10, border: 'none', cursor: 'pointer',
+                            background: 'var(--accent-primary)', color: '#fff',
+                            fontFamily: 'inherit', fontSize: '0.9rem', fontWeight: 600,
+                            whiteSpace: 'nowrap',
+                        }}
+                    >
+                        Search
+                    </button>
+                </div>
             </div>
 
             {usingDemo && (
@@ -121,7 +156,13 @@ export default function ProductsPage() {
 
             {/* ===== PRODUCTS GROUPED BY STORE ===== */}
             {(() => {
-                const inStockProducts = products.filter(p => !p.stock || p.stock > 0);
+                const q = activeSearch.toLowerCase();
+                const inStockProducts = products.filter(p => {
+                    if (p.stock !== undefined && p.stock <= 0) return false;
+                    if (!q) return true;
+                    return (p.title || '').toLowerCase().includes(q) ||
+                           (p.seller_name || '').toLowerCase().includes(q);
+                });
                 // Group by seller_name
                 const storeMap = {};
                 inStockProducts.forEach(p => {
@@ -130,6 +171,15 @@ export default function ProductsPage() {
                     storeMap[store].push(p);
                 });
                 const stores = Object.entries(storeMap);
+                if (stores.length === 0) return (
+                    <div style={{ textAlign: 'center', padding: '60px 0', color: 'var(--text-muted)' }}>
+                        <p style={{ fontSize: '1rem', marginBottom: 8 }}>No products found for "{activeSearch}"</p>
+                        <button onClick={() => { setBrowseSearch(''); setActiveSearch(''); }} style={{
+                            background: 'none', border: 'none', color: 'var(--accent-primary)',
+                            cursor: 'pointer', fontWeight: 600, fontSize: '0.9rem',
+                        }}>Clear search</button>
+                    </div>
+                );
                 return stores.map(([storeName, storeProducts]) => (
                     <div key={storeName} style={{ marginBottom: 40 }}>
                         {/* Store header */}

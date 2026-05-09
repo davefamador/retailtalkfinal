@@ -347,6 +347,10 @@ export async function adminDeleteProduct(productId) {
     return apiFetch(`/admin/products/${productId}`, { method: 'DELETE' });
 }
 
+export async function adminGetProductHistory(productId) {
+    return apiFetch(`/admin/products/${productId}/history`);
+}
+
 export async function adminGetUserDetail(userId) {
     return apiFetch(`/admin/users/${userId}/detail`);
 }

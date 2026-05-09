@@ -846,9 +846,11 @@ async def admin_update_product(
     """Admin can update product title, price, stock, and active status."""
     sb = get_supabase()
 
-    existing = sb.table("products").select("id").eq("id", product_id).execute()
+    existing = sb.table("products").select("id, stock").eq("id", product_id).execute()
     if not existing.data:
         raise HTTPException(status_code=404, detail="Product not found")
+
+    old_stock = int(existing.data[0].get("stock", 0))
 
     update_data = {k: v for k, v in req.model_dump().items() if k in req.model_fields_set}
     if not update_data:
@@ -857,6 +859,19 @@ async def admin_update_product(
     result = sb.table("products").update(update_data).eq("id", product_id).execute()
     if not result.data:
         raise HTTPException(status_code=500, detail="Failed to update product")
+
+    # Log stock change if stock was modified
+    if "stock" in update_data and update_data["stock"] != old_stock:
+        admin_user = sb.table("users").select("full_name").eq("id", admin["sub"]).execute()
+        admin_name = admin_user.data[0]["full_name"] if admin_user.data else "Admin"
+        sb.table("stock_history").insert({
+            "product_id": product_id,
+            "changed_by": admin["sub"],
+            "changed_by_name": admin_name,
+            "old_stock": old_stock,
+            "new_stock": int(update_data["stock"]),
+            "change_type": "admin_update",
+        }).execute()
 
     # Re-fetch with seller name
     p_result = sb.table("products").select(_PRODUCT_COLS + ", users!products_seller_id_fkey(full_name, department_id)").eq("id", product_id).execute()
@@ -884,6 +899,76 @@ async def admin_update_product(
         department_id=dept_id,
         department_name=seller_name if dept_id else None,
     )
+
+
+@router.get("/products/{product_id}/history")
+async def get_product_history(product_id: str, admin: dict = Depends(require_admin)):
+    """Return stock modification history and buyer transactions for a product."""
+    sb = get_supabase()
+
+    # Stock history (admin manual changes + purchases + restock deliveries)
+    sh_resp = sb.table("stock_history").select("*").eq("product_id", product_id).order("created_at", desc=True).limit(100).execute()
+
+    # Restock history
+    rr_resp = sb.table("restock_requests").select("id, requested_quantity, status, notes, created_at, staff_id").eq("product_id", product_id).order("created_at", desc=True).limit(50).execute()
+
+    # Purchase transactions
+    tx_resp = sb.table("product_transactions").select("id, buyer_id, quantity, amount, status, purchase_type, created_at").eq("product_id", product_id).order("created_at", desc=True).limit(100).execute()
+
+    # Enrich transactions with buyer names
+    buyer_ids = list({t["buyer_id"] for t in (tx_resp.data or []) if t.get("buyer_id")})
+    buyer_names = {}
+    if buyer_ids:
+        bu_resp = sb.table("users").select("id, full_name").in_("id", buyer_ids).execute()
+        buyer_names = {u["id"]: u["full_name"] for u in (bu_resp.data or [])}
+
+    transactions = []
+    for t in (tx_resp.data or []):
+        transactions.append({
+            "id": t["id"],
+            "buyer_name": buyer_names.get(t["buyer_id"], "Unknown"),
+            "quantity": t["quantity"],
+            "amount": float(t["amount"]),
+            "status": t["status"],
+            "purchase_type": t.get("purchase_type", "delivery"),
+            "created_at": t["created_at"],
+        })
+
+    stock_history = []
+    for s in (sh_resp.data or []):
+        stock_history.append({
+            "id": s["id"],
+            "changed_by_name": s.get("changed_by_name", "Admin"),
+            "old_stock": s["old_stock"],
+            "new_stock": s["new_stock"],
+            "change_type": s.get("change_type", "admin_update"),
+            "notes": s.get("notes"),
+            "created_at": s["created_at"],
+        })
+
+    # Enrich restock rows with staff names
+    staff_ids = list({r["staff_id"] for r in (rr_resp.data or []) if r.get("staff_id")})
+    staff_names = {}
+    if staff_ids:
+        st_resp = sb.table("users").select("id, full_name").in_("id", staff_ids).execute()
+        staff_names = {u["id"]: u["full_name"] for u in (st_resp.data or [])}
+
+    restock_history = []
+    for r in (rr_resp.data or []):
+        restock_history.append({
+            "id": r["id"],
+            "requested_by": staff_names.get(r.get("staff_id", ""), "Staff"),
+            "quantity": r["requested_quantity"],
+            "status": r["status"],
+            "notes": r.get("notes"),
+            "created_at": r["created_at"],
+        })
+
+    return {
+        "stock_history": stock_history,
+        "restock_history": restock_history,
+        "transactions": transactions,
+    }
 
 
 # --- User Detail (Clickable Panel) ---

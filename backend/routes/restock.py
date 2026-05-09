@@ -245,8 +245,10 @@ async def complete_restock_delivery(request_id: str, delivery_user: dict = Depen
     product_title = product.data[0].get("title", "Product") if product.data else "Product"
 
     # Increment product stock
+    old_stock = 0
     if product.data:
-        new_stock = int(product.data[0]["stock"]) + qty
+        old_stock = int(product.data[0]["stock"])
+        new_stock = old_stock + qty
         sb.table("products").update({"stock": new_stock}).eq("id", r["product_id"]).execute()
 
     # Update restock request
@@ -258,6 +260,18 @@ async def complete_restock_delivery(request_id: str, delivery_user: dict = Depen
     # Get delivery person name
     delivery_user_info = sb.table("users").select("full_name").eq("id", user_id).execute()
     delivery_name = delivery_user_info.data[0]["full_name"] if delivery_user_info.data else "Deliveryman"
+
+    # Log stock increase to stock_history
+    if product.data:
+        sb.table("stock_history").insert({
+            "product_id": r["product_id"],
+            "changed_by": user_id,
+            "changed_by_name": delivery_name,
+            "old_stock": old_stock,
+            "new_stock": old_stock + qty,
+            "change_type": "restock_delivered",
+            "notes": f"Restock delivered — {qty} unit(s) added",
+        }).execute()
 
     # Get admin user
     admin_user = sb.table("users").select("id").eq("role", "admin").limit(1).execute()
